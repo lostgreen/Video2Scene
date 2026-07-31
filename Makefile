@@ -1,4 +1,4 @@
-PYTHON ?= python3
+PYTHON ?= $(if $(SMCB_PYTHON),$(SMCB_PYTHON),python3)
 
 .PHONY: setup lint test doctor smoke
 
@@ -6,8 +6,8 @@ setup:
 	$(PYTHON) -m pip install -e . -r requirements/dev.txt
 
 lint:
-	ruff check src tests
-	ruff format --check src tests
+	ruff check src tests blender_scripts
+	ruff format --check src tests blender_scripts
 	mypy src
 
 test:
