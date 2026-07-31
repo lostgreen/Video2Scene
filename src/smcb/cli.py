@@ -115,6 +115,7 @@ def build_parser() -> argparse.ArgumentParser:
         action.add_argument("--output", type=Path)
         action.add_argument("--preview-output", type=Path)
         action.add_argument("--blender-bin")
+        action.add_argument("--force", action="store_true")
 
     sample = commands.add_parser("sample-scene", help="write one deterministic Scene Program")
     sample.add_argument("--config", type=Path, default=Path("configs/dataset/scene_smoke.yaml"))
@@ -211,6 +212,7 @@ def _handle_assets(args: argparse.Namespace, config: ProjectConfig) -> int:
         blender_bin=_blender_bin(config, args.blender_bin),
         blender_script=config.root / "blender_scripts" / "normalize_asset.py",
         limit=args.limit,
+        force=args.force,
     )
     _print_json(
         {

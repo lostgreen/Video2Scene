@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 import bpy
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 
 def parse_args() -> argparse.Namespace:
@@ -146,7 +146,10 @@ def main() -> None:
             obj.parent = root
             obj.matrix_world = world
     translation = Vector((-center_x, -center_y, -raw_min.z))
-    root.location = translation
+    translation_matrix = Matrix.Translation(translation)
+    for obj in imported:
+        if obj.parent == root:
+            obj.matrix_world = translation_matrix @ obj.matrix_world
     bpy.context.view_layer.update()
     canonical_min, canonical_max = mesh_bounds(mesh_objects)
     dimensions = canonical_max - canonical_min

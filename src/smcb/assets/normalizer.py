@@ -48,6 +48,7 @@ def normalize_library(
     blender_bin: str,
     blender_script: Path,
     limit: int | None = None,
+    force: bool = False,
 ) -> AssetIndex:
     """Normalize a deterministic slice of a source library and rebuild its index."""
     manifest = load_source_manifest(manifest_path)
@@ -74,7 +75,8 @@ def normalize_library(
             for name in ("front", "back", "left", "right", "top", "isometric")
         ]
         if (
-            glb_path.is_file()
+            not force
+            and glb_path.is_file()
             and metadata_path.is_file()
             and all(path.is_file() for path in expected_previews)
         ):
