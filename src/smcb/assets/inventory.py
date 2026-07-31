@@ -27,7 +27,7 @@ def stable_asset_id(pack_id: str, relative_path: str) -> str:
 
 def build_inventory(raw_dir: Path, output_path: Path | None = None) -> dict[str, Any]:
     """Hash the materialized upstream tree and optionally write its lock file."""
-    excluded = {"source_inventory.json"}
+    excluded = {"download_report.json", "source_inventory.json"}
     files: list[dict[str, Any]] = []
     aggregate = hashlib.sha256()
     for path in sorted(item for item in raw_dir.rglob("*") if item.is_file()):

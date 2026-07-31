@@ -25,6 +25,9 @@ def test_inventory_is_sorted_and_content_addressed(tmp_path: Path) -> None:
 
 
 def test_manifest_globs_exclude_rigged_character_assets() -> None:
-    patterns = ["Character/**"]
+    patterns = ["Character/**", "**/Character/**"]
     assert _source_is_excluded("Character/glTF/Character.gltf", patterns)
+    assert _source_is_excluded(
+        "Platformer Game Kit - Dec 2021/Character/glTF/Character.gltf", patterns
+    )
     assert not _source_is_excluded("Cubes/glTF/Cube_Bricks.gltf", patterns)

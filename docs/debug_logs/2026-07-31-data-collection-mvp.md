@@ -15,5 +15,7 @@
   it as a dependency. Normalization clears editor-only custom-shape links before removal.
 - Blender 4.5 still restores that helper through the imported glTF rig extension after orphan
   cleanup. MVP manifest policy now excludes `Character/**`; 108 static glTF assets remain.
+- Full Drive download stopped on an irrelevant OBJ file. Acquisition now lists the folder once,
+  downloads only `.gltf/.bin/.txt`, resumes partial files, and requires at least 30 eligible GLTFs.
 - Constraints: do not version Demo, raw assets, normalized assets, previews, or generated samples.
 - Next: implement asset normalization; implement deterministic sampler/compiler; run local unit checks; validate Levels 1-3 on KML.

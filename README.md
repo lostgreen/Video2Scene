@@ -49,7 +49,9 @@ On the KML development machine the code checkout is separate at
 
 The tracked manifest points to Quaternius' official Ultimate Platformer Pack. The source is
 CC0 and the upstream Drive folder contains the Blend, FBX, glTF, and OBJ variants. Downloaded
-files remain untouched; `source_inventory.json` records their aggregate SHA-256.
+files remain untouched. Acquisition fetches the compiler-facing `.gltf/.bin` payload plus the
+upstream license, while `download_report.json` records per-file failures and
+`source_inventory.json` records the available tree's aggregate SHA-256.
 
 ```bash
 make assets                 # fetch, inventory, normalize the first 30 assets

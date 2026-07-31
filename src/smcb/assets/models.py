@@ -32,7 +32,9 @@ class AssetSourceManifest(AssetModel):
     download: DownloadSpec
     license: LicenseSpec
     preferred_formats: list[str]
+    download_suffixes: list[str]
     excluded_globs: list[str] = Field(default_factory=list)
+    minimum_required_assets: int = Field(default=30, gt=0)
     expected_model_count: int = Field(gt=0)
     inventory_sha256: str | None = None
     notes: str
