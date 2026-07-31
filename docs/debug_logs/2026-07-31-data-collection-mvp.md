@@ -4,20 +4,19 @@
 - Current evidence: Blender 4.5.12 headless EEVEE smoke passed on the KML development machine.
 - Data placement: `/m2v_intern/xuboshen/zgw/Video2Scene`; code checkout remains under `/home`.
 - Source: Quaternius Ultimate Platformer Pack, official Google Drive folder, CC0.
-- Latest failure fingerprint: Level 1 QC rejected all attempts because the normalized GLB
-  dropped the canonical translation stored on an outer Empty (`bbox_min_z=-0.2985`).
-- Current fix: bake canonical translation into top-level imported nodes and rebuild with
-  `assets normalize --force`; attempt directories now include the generator commit prefix so
-  old Level 1 attempt results remain available but do not block a fixed-code replay.
-- Follow-up evidence: `Character.gltf` contains an unrelated top-level `Icosphere` at Z=-1.
-  Rig normalization now retains only armature ancestors/descendants and drops source helpers.
-- `Icosphere` was also referenced by 29 pose-bone custom shapes, causing the exporter to restore
-  it as a dependency. Normalization clears editor-only custom-shape links before removal.
-- Blender 4.5 still restores that helper through the imported glTF rig extension after orphan
-  cleanup. MVP manifest policy now excludes `Character/**`; 108 static glTF assets remain.
-- Full Drive download stopped on an irrelevant OBJ file. Acquisition now lists the folder once,
-  downloads only `.gltf/.bin/.txt`, resumes partial files, and requires at least 30 eligible GLTFs.
-- A later Drive request stalled without a library timeout. The tracked MVP manifest now caps
-  acquisition at 30 eligible rigid glTFs and applies a 120-second per-file alarm.
+- Current result: Level 1 passed (1/1), Level 2 passed (4/4, one per template), and a
+  512x512/24fps/72-frame production probe passed QC.
+- Current source state: 30 eligible rigid glTF assets are indexed and normalized; six previews
+  and a contact sheet are generated for each. Acquisition inventory/report are materialized.
+- Current blocker: `/m2v_intern/xuboshen/zgw/Video2Scene` returns `Disk quota exceeded` on file
+  writes. Final `.env.local` points there, but validation artifacts temporarily live under
+  `/home/xuboshen/zgw/video2scene_integration_data`.
+- Stale evidence: the first Character-based Level 1 attempts failed with
+  `bbox_min_z=-0.2985`; they predate the rigid-only manifest policy and should not be reused.
+- Decisions: exclude `Character/**` from the rigid MVP; acquire 30 eligible glTF assets plus
+  support/license files; resume partial downloads with a 120-second per-file deadline.
 - Constraints: do not version Demo, raw assets, normalized assets, previews, or generated samples.
-- Next: implement asset normalization; implement deterministic sampler/compiler; run local unit checks; validate Levels 1-3 on KML.
+- Latest checks: local Ruff/mypy/14 pytest pass; KML 14 pytest pass; dataset contract validators
+  pass for Level 1 and Level 2.
+- Next: restore write quota on `/m2v_intern`, run `make assets`, then `make dataset-mvp` and
+  `make dataset-check` in the configured final data root.
