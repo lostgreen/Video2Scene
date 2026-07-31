@@ -81,7 +81,9 @@ video2scene generate \
 ```
 
 Generation is resumable. A failed attempt remains below `_attempts/` with `qc.json` and
-bounded logs; only passing attempts are renamed to `sample_XXXXXX/`.
+bounded logs; only passing attempts are renamed to `sample_XXXXXX/`. Attempt directories carry
+the generator Git commit prefix, so fixed compiler code can replay the same deterministic seeds
+without deleting stale evidence.
 
 ## Sample contract
 

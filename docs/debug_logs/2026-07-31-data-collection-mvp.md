@@ -7,6 +7,7 @@
 - Latest failure fingerprint: Level 1 QC rejected all attempts because the normalized GLB
   dropped the canonical translation stored on an outer Empty (`bbox_min_z=-0.2985`).
 - Current fix: bake canonical translation into top-level imported nodes and rebuild with
-  `assets normalize --force`; old Level 1 attempt results are stale.
+  `assets normalize --force`; attempt directories now include the generator commit prefix so
+  old Level 1 attempt results remain available but do not block a fixed-code replay.
 - Constraints: do not version Demo, raw assets, normalized assets, previews, or generated samples.
 - Next: implement asset normalization; implement deterministic sampler/compiler; run local unit checks; validate Levels 1-3 on KML.

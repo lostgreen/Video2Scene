@@ -108,7 +108,7 @@ def build_dataset(
         accepted = False
         for attempt in range(config.quality_control.max_resample_attempts):
             scene_seed = seed + sample_index * 100_000 + attempt
-            attempt_dir = attempts_root / f"{sample_id}_attempt_{attempt:02d}"
+            attempt_dir = attempts_root / (f"{sample_id}_attempt_{attempt:02d}_{commit[:8]}")
             previous_qc = attempt_dir / "qc.json"
             if previous_qc.is_file():
                 continue
