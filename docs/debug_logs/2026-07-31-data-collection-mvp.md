@@ -9,5 +9,7 @@
 - Current fix: bake canonical translation into top-level imported nodes and rebuild with
   `assets normalize --force`; attempt directories now include the generator commit prefix so
   old Level 1 attempt results remain available but do not block a fixed-code replay.
+- Follow-up evidence: `Character.gltf` contains an unrelated top-level `Icosphere` at Z=-1.
+  Rig normalization now retains only armature ancestors/descendants and drops source helpers.
 - Constraints: do not version Demo, raw assets, normalized assets, previews, or generated samples.
 - Next: implement asset normalization; implement deterministic sampler/compiler; run local unit checks; validate Levels 1-3 on KML.

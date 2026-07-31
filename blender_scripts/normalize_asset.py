@@ -61,6 +61,27 @@ def mesh_bounds(objects: list[bpy.types.Object]) -> tuple[Vector, Vector]:
     )
 
 
+def filter_asset_objects(imported: list[bpy.types.Object]) -> list[bpy.types.Object]:
+    """Drop source-scene helpers while preserving complete rig hierarchies."""
+    armatures = [obj for obj in imported if obj.type == "ARMATURE"]
+    keep: set[bpy.types.Object]
+    if armatures:
+        keep = set(armatures)
+        for armature in armatures:
+            keep.update(armature.children_recursive)
+            ancestor = armature.parent
+            while ancestor is not None:
+                keep.add(ancestor)
+                ancestor = ancestor.parent
+    else:
+        keep = {obj for obj in imported if obj.type not in {"CAMERA", "LIGHT"}}
+    filtered = [obj for obj in imported if obj in keep]
+    for obj in imported:
+        if obj not in keep:
+            bpy.data.objects.remove(obj, do_unlink=True)
+    return filtered
+
+
 def aim_camera(camera: bpy.types.Object, target: Vector) -> None:
     camera.rotation_euler = (target - camera.location).to_track_quat("-Z", "Y").to_euler()
 
@@ -132,7 +153,7 @@ def main() -> None:
 
     before = set(bpy.data.objects)
     bpy.ops.import_scene.gltf(filepath=str(args.source))
-    imported = [obj for obj in bpy.data.objects if obj not in before]
+    imported = filter_asset_objects([obj for obj in bpy.data.objects if obj not in before])
     mesh_objects = [obj for obj in imported if obj.type == "MESH"]
     raw_min, raw_max = mesh_bounds(mesh_objects)
     center_x = (raw_min.x + raw_max.x) * 0.5
