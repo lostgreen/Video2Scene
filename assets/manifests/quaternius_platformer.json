@@ -15,6 +15,7 @@
     "upstream_license_glob": "**/*[Ll]icense*.txt"
   },
   "preferred_formats": ["gltf", "blend", "fbx", "obj"],
+  "excluded_globs": ["Character/**"],
   "expected_model_count": 112,
   "inventory_sha256": null,
   "notes": "The upstream is a Drive folder rather than a versioned archive. The materialized inventory hash is generated after download."

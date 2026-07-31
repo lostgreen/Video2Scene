@@ -59,6 +59,9 @@ video2scene assets doctor
 
 Each normalized asset produces `<asset_id>.glb`, `<asset_id>.json`, six PNG views, and one
 contact sheet. `normalized/index.json` is the only asset lookup used by the compiler.
+The MVP manifest excludes `Character/**`: those rigged files carry Blender editor custom-shape
+helpers that are outside the rigid-object scope. The remaining 108 glTF assets cover the first
+30-asset target without that ambiguity.
 
 ## Dataset workflow
 

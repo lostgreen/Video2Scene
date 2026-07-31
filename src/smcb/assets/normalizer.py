@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import subprocess
+from fnmatch import fnmatch
 from pathlib import Path
 
 from PIL import Image, ImageOps
@@ -39,6 +40,10 @@ def _manifest_hash(entries: list[AssetIndexEntry]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def _source_is_excluded(relative_path: str, patterns: list[str]) -> bool:
+    return any(fnmatch(relative_path, pattern) for pattern in patterns)
+
+
 def normalize_library(
     *,
     source: Path,
@@ -58,7 +63,12 @@ def normalize_library(
     logs_dir = output / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
 
-    candidates = sorted(path for path in source.rglob("*.gltf") if path.is_file())
+    candidates = sorted(
+        path
+        for path in source.rglob("*.gltf")
+        if path.is_file()
+        and not _source_is_excluded(path.relative_to(source).as_posix(), manifest.excluded_globs)
+    )
     if limit is not None:
         candidates = candidates[:limit]
     if not candidates:
@@ -119,6 +129,8 @@ def normalize_library(
     entries: list[AssetIndexEntry] = []
     for metadata_path in sorted(output.glob(f"{manifest.pack_id}_*.json")):
         metadata = AssetMetadata.model_validate_json(metadata_path.read_text(encoding="utf-8"))
+        if _source_is_excluded(metadata.source_relative_path, manifest.excluded_globs):
+            continue
         glb_path = output / f"{metadata.asset_id}.glb"
         if not glb_path.is_file():
             continue
