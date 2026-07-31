@@ -4,19 +4,25 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scene-motion-code-bench"
-version = "0.0.1"
+version = "0.1.0"
 description = "Executable video-to-scene benchmark infrastructure"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
 authors = [{ name = "lostgreen" }]
-dependencies = []
+dependencies = [
+  "gdown>=5.2,<7",
+  "Pillow>=10.4,<13",
+  "pydantic>=2.10,<3",
+  "PyYAML>=6,<7",
+]
 
 [project.optional-dependencies]
 dev = [
   "mypy>=1.16,<2",
   "pytest>=8.3,<9",
   "ruff>=0.12,<1",
+  "types-PyYAML>=6.0.12,<7",
 ]
 server = [
   "fastapi>=0.115,<1",
@@ -25,6 +31,7 @@ server = [
 
 [project.scripts]
 smcb = "smcb.cli:main"
+video2scene = "smcb.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

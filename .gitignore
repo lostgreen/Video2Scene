@@ -30,3 +30,8 @@ web/dist/
 /artifacts/**
 !/artifacts/**/
 !/artifacts/**/.gitkeep
+
+# Asset payloads are reproducible external data. Only manifests are versioned.
+/assets/raw/
+/assets/normalized/
+/assets/previews/

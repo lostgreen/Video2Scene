@@ -1,0 +1,21 @@
+{
+  "manifest_version": "1.0",
+  "pack_id": "quaternius_platformer",
+  "display_name": "Ultimate Platformer Pack",
+  "publisher": "Quaternius",
+  "source_page": "https://quaternius.com/packs/ultimateplatformer.html",
+  "download": {
+    "kind": "google_drive_folder",
+    "folder_id": "1NDZn_aGnn0vfFV3M22Y8GPcDjO8BVcLs"
+  },
+  "license": {
+    "spdx": "CC0-1.0",
+    "name": "Creative Commons Zero v1.0 Universal",
+    "source_claim": "The official pack page marks the asset pack as CC0.",
+    "upstream_license_glob": "**/*[Ll]icense*.txt"
+  },
+  "preferred_formats": ["gltf", "blend", "fbx", "obj"],
+  "expected_model_count": 112,
+  "inventory_sha256": null,
+  "notes": "The upstream is a Drive folder rather than a versioned archive. The materialized inventory hash is generated after download."
+}

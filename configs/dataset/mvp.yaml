@@ -1,0 +1,34 @@
+dataset:
+  name: video2scene_mvp_v0
+  num_samples: 100
+  output_subdir: generated/mvp
+assets:
+  pack: quaternius_platformer
+  normalized_subdir: normalized
+  candidate_library_size: 20
+scene:
+  object_count:
+    min: 2
+    max: 5
+templates:
+  static_orbit: 0.25
+  moving_object: 0.30
+  moving_camera: 0.30
+  parent_motion: 0.15
+video:
+  width: 512
+  height: 512
+  fps: 24
+  duration_seconds:
+    min: 3
+    max: 5
+render:
+  engine: BLENDER_EEVEE_NEXT
+  samples: 16
+quality_control:
+  min_visible_frame_ratio: 0.50
+  min_visible_pixels: 500
+  max_pairwise_screen_iou: 0.75
+  min_motion_distance: 0.20
+  max_resample_attempts: 20
+seed: 42
