@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import json
+import signal
+from collections.abc import Iterator
+from contextlib import contextmanager
 from fnmatch import fnmatch
 from pathlib import Path
+from types import FrameType
 from typing import NamedTuple, cast
 
 from gdown.download import download
@@ -19,6 +23,25 @@ class DriveFile(NamedTuple):
     id: str
     path: str
     local_path: str
+
+
+class AssetDownloadTimeout(Exception):
+    """Raised when one upstream file stalls beyond the manifest deadline."""
+
+
+def _raise_download_timeout(_signum: int, _frame: FrameType | None) -> None:
+    raise AssetDownloadTimeout
+
+
+@contextmanager
+def _download_deadline(seconds: int) -> Iterator[None]:
+    previous = signal.signal(signal.SIGALRM, _raise_download_timeout)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous)
 
 
 def load_source_manifest(path: Path) -> AssetSourceManifest:
@@ -44,11 +67,19 @@ def fetch_source(manifest_path: Path, asset_root: Path) -> dict[str, object]:
             skip_download=True,
         ),
     )
-    selected = [
+    relevant = [
         item
         for item in listing
         if Path(item.path).suffix.lower() in set(manifest.download_suffixes)
     ]
+    support_files = [item for item in relevant if not item.path.lower().endswith(".gltf")]
+    eligible_gltf = [
+        item
+        for item in relevant
+        if item.path.lower().endswith(".gltf")
+        and not _is_excluded(item.path, manifest.excluded_globs)
+    ][: manifest.acquisition_asset_limit]
+    selected = [*support_files, *eligible_gltf]
     failures: list[str] = []
     for item in selected:
         target = Path(item.local_path)
@@ -56,24 +87,19 @@ def fetch_source(manifest_path: Path, asset_root: Path) -> dict[str, object]:
         if target.is_file():
             continue
         try:
-            result = download(
-                id=item.id,
-                output=str(target),
-                quiet=True,
-                resume=True,
-            )
-        except (DownloadError, OSError):
+            with _download_deadline(manifest.per_file_timeout_seconds):
+                result = download(
+                    id=item.id,
+                    output=str(target),
+                    quiet=True,
+                    resume=True,
+                )
+        except (AssetDownloadTimeout, DownloadError, OSError):
             result = None
         if result is None:
             failures.append(item.path)
 
-    eligible_gltf_count = sum(
-        1
-        for item in selected
-        if item.path.lower().endswith(".gltf")
-        and not _is_excluded(item.path, manifest.excluded_globs)
-        and Path(item.local_path).is_file()
-    )
+    eligible_gltf_count = sum(1 for item in eligible_gltf if Path(item.local_path).is_file())
     report = {
         "schema_version": "1.0",
         "selected_file_count": len(selected),

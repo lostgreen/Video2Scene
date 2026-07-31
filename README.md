@@ -52,6 +52,8 @@ CC0 and the upstream Drive folder contains the Blend, FBX, glTF, and OBJ variant
 files remain untouched. Acquisition fetches the compiler-facing `.gltf/.bin` payload plus the
 upstream license, while `download_report.json` records per-file failures and
 `source_inventory.json` records the available tree's aggregate SHA-256.
+The MVP manifest caps acquisition at 30 eligible rigid glTF assets and enforces a 120-second
+per-file network deadline; partial files remain resumable.
 
 ```bash
 make assets                 # fetch, inventory, normalize the first 30 assets

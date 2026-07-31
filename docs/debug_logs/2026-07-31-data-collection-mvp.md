@@ -17,5 +17,7 @@
   cleanup. MVP manifest policy now excludes `Character/**`; 108 static glTF assets remain.
 - Full Drive download stopped on an irrelevant OBJ file. Acquisition now lists the folder once,
   downloads only `.gltf/.bin/.txt`, resumes partial files, and requires at least 30 eligible GLTFs.
+- A later Drive request stalled without a library timeout. The tracked MVP manifest now caps
+  acquisition at 30 eligible rigid glTFs and applies a 120-second per-file alarm.
 - Constraints: do not version Demo, raw assets, normalized assets, previews, or generated samples.
 - Next: implement asset normalization; implement deterministic sampler/compiler; run local unit checks; validate Levels 1-3 on KML.

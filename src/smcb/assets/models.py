@@ -34,6 +34,8 @@ class AssetSourceManifest(AssetModel):
     preferred_formats: list[str]
     download_suffixes: list[str]
     excluded_globs: list[str] = Field(default_factory=list)
+    acquisition_asset_limit: int = Field(default=30, gt=0)
+    per_file_timeout_seconds: int = Field(default=120, gt=0)
     minimum_required_assets: int = Field(default=30, gt=0)
     expected_model_count: int = Field(gt=0)
     inventory_sha256: str | None = None

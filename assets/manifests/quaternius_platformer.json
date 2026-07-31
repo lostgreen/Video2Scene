@@ -17,6 +17,8 @@
   "preferred_formats": ["gltf", "blend", "fbx", "obj"],
   "download_suffixes": [".gltf", ".bin", ".txt"],
   "excluded_globs": ["Character/**", "**/Character/**"],
+  "acquisition_asset_limit": 30,
+  "per_file_timeout_seconds": 120,
   "minimum_required_assets": 30,
   "expected_model_count": 112,
   "inventory_sha256": null,
