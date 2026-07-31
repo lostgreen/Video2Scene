@@ -1,0 +1,4 @@
+# Keep these pins aligned with the pyproject.toml development dependency ranges.
+mypy==1.17.1
+pytest==8.4.2
+ruff==0.12.0

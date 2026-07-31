@@ -1,0 +1,32 @@
+# Existing local demo material is intentionally never versioned.
+/[Dd]emo/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+
+# Local configuration and tooling
+.env
+.env.*
+!.env.example
+.tools/
+.DS_Store
+
+# Web
+web/node_modules/
+web/dist/
+
+# Generated datasets and artifacts. Preserve only directory placeholders.
+/data/**
+!/data/**/
+!/data/**/.gitkeep
+/artifacts/**
+!/artifacts/**/
+!/artifacts/**/.gitkeep
