@@ -68,6 +68,8 @@ def filter_asset_objects(imported: list[bpy.types.Object]) -> list[bpy.types.Obj
     if armatures:
         keep = set(armatures)
         for armature in armatures:
+            for pose_bone in armature.pose.bones:
+                pose_bone.custom_shape = None
             keep.update(armature.children_recursive)
             ancestor = armature.parent
             while ancestor is not None:
