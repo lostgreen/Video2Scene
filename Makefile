@@ -2,7 +2,7 @@ PYTHON_RUN = scripts/run_python.sh
 V2S = $(PYTHON_RUN) -m smcb.cli
 ASSET_LIMIT ?= 30
 
-.PHONY: setup lint test doctor smoke assets asset-previews scene-smoke dataset-smoke dataset-mvp dataset-check schema
+.PHONY: setup lint test doctor sceneact-doctor smoke assets asset-previews scene-smoke dataset-smoke dataset-mvp dataset-check schema
 
 setup:
 	$(PYTHON_RUN) -m pip install -e . -r requirements/dev.txt
@@ -17,6 +17,9 @@ test:
 
 doctor:
 	$(V2S) doctor
+
+sceneact-doctor:
+	$(V2S) sceneact doctor
 
 smoke:
 	scripts/smoke_test.sh

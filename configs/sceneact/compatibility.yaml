@@ -1,0 +1,12 @@
+upstream:
+  repository: https://github.com/Feinaldo2/SceneActBench.git
+  commit: 5b01037454c2ef96c4dea4006b927d27da9d5447
+  license: MIT
+dynamic_contract:
+  scorer: src/harness/metrics_t6.py
+  fps: 24
+  frame_count: 144
+runtime:
+  bind_host: 127.0.0.1
+  disable_telemetry: true
+  allow_model_calls: false

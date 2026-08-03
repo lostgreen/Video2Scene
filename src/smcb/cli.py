@@ -19,6 +19,7 @@ from smcb.common.config import ProjectConfig
 from smcb.dsl.io import load_scene, write_json_schema, write_scene
 from smcb.generation.config import load_dataset_config
 from smcb.generation.sampler import load_asset_index, sample_scene
+from smcb.integrations.sceneactbench import SceneActConfig, collect_sceneact_doctor
 from smcb.storage.dataset import build_dataset, reproduce_sample, validate_dataset
 
 
@@ -116,6 +117,18 @@ def build_parser() -> argparse.ArgumentParser:
         action.add_argument("--preview-output", type=Path)
         action.add_argument("--blender-bin")
         action.add_argument("--force", action="store_true")
+
+    sceneact = commands.add_parser(
+        "sceneact", help="inspect and operate the pinned SceneActBench compatibility layer"
+    )
+    sceneact_commands = sceneact.add_subparsers(dest="sceneact_command", required=True)
+    sceneact_doctor = sceneact_commands.add_parser(
+        "doctor", help="check the pinned harness and minimal Dynamic scorer runtime"
+    )
+    sceneact_doctor.add_argument("--project-root", type=Path)
+    sceneact_doctor.add_argument("--sceneact-root", type=Path)
+    sceneact_doctor.add_argument("--data-root", type=Path)
+    sceneact_doctor.add_argument("--blender-bin")
 
     sample = commands.add_parser("sample-scene", help="write one deterministic Scene Program")
     sample.add_argument("--config", type=Path, default=Path("configs/dataset/scene_smoke.yaml"))
@@ -225,6 +238,22 @@ def _handle_assets(args: argparse.Namespace, config: ProjectConfig) -> int:
     return 0
 
 
+def _handle_sceneact(args: argparse.Namespace) -> int:
+    if args.sceneact_command != "doctor":
+        raise AssertionError(f"unhandled SceneActBench command: {args.sceneact_command}")
+    project = _root_config(args.project_root)
+    config = SceneActConfig.from_project(project)
+    config = replace(
+        config,
+        root=(args.sceneact_root or config.root).resolve(),
+        data_root=(args.data_root or config.data_root).resolve(),
+        blender_bin=args.blender_bin or config.blender_bin,
+    )
+    report = collect_sceneact_doctor(config)
+    _print_json(asdict(report))
+    return 0 if report.passed else 1
+
+
 def _handle_sample(args: argparse.Namespace, config: ProjectConfig) -> int:
     dataset_config = load_dataset_config(_manifest_path(config, args.config))
     index_path = (args.asset_index or config.asset_root / "normalized" / "index.json").resolve()
@@ -291,6 +320,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "doctor":
         return _handle_doctor(args)
+    if args.command == "sceneact":
+        return _handle_sceneact(args)
     config = _root_config()
     if args.command == "assets":
         return _handle_assets(args, config)

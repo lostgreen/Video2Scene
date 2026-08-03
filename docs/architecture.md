@@ -16,3 +16,16 @@ environment. Generated attempts are immutable and promoted by directory rename o
 
 Large state is separated from the Git checkout with `SMCB_PROJECT_DATA_ROOT`. The KML layout is
 documented in [`../assets/README.md`](../assets/README.md).
+
+SceneActBench is an isolated downstream compatibility layer:
+
+```text
+Scene Program -> deterministic Blender outputs -> SceneAct-compatible package
+                                                   -> pinned external harness/scorer
+
+master rollout -> temporal edit map phi(t) -> World-Time observations and exact mapping GT
+```
+
+The compatibility layer never generates GT and does not alter the current compiler. See
+[`integrations/sceneactbench.md`](integrations/sceneactbench.md) for its pinned boundary and
+[`world_time_direction.md`](world_time_direction.md) for the benchmark direction built above it.

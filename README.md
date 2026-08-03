@@ -8,8 +8,10 @@ official asset pack -> canonical GLBs -> Scene Program v0.1
                     -> automatic QC -> reproducible dataset samples
 ```
 
-This milestone deliberately excludes model inference, prediction evaluation, physics,
-rich render passes, and the web viewer.
+The next staged milestone adds SceneActBench only as a pinned execution/evaluation harness. The
+long-term task is World-Time Canonicalization: recovering a canonical world timeline and a dense
+video-to-world time mapping from temporally edited observations. Camera estimation, asset
+retrieval, physics, rich render passes, and the web viewer remain outside the current gate.
 
 ## Requirements
 
@@ -29,6 +31,22 @@ make smoke
 
 Both `smcb` and `video2scene` resolve to the same CLI. Make targets use
 `scripts/run_python.sh`, which loads `.env.local` without asking Make to parse shell syntax.
+
+## SceneActBench compatibility
+
+Initialize the pinned MIT-licensed harness and run the read-only compatibility check:
+
+```bash
+scripts/fetch_sceneactbench.sh
+pip install -e ".[sceneact]"
+export DISABLE_TELEMETRY=true
+make sceneact-doctor
+```
+
+This check does not download the SceneActBench dataset, launch an agent, or call a model. The
+third-party code stays behind `src/smcb/integrations/sceneactbench/`, while Scene Program remains
+the only GT source. See [the integration boundary](docs/integrations/sceneactbench.md) and the
+[World-Time direction](docs/world_time_direction.md).
 
 ## External data
 
@@ -133,6 +151,7 @@ reproduction.
 - `src/smcb/assets/`: acquisition, inventory, normalization orchestration
 - `src/smcb/dsl/`: Scene Program v0.1 typed contract
 - `src/smcb/generation/`: deterministic sampler and QC
+- `src/smcb/integrations/sceneactbench/`: pinned harness configuration and compatibility checks
 - `src/smcb/blender/`: Blender subprocess boundary
 - `blender_scripts/`: dependency-free scripts executed by Blender
 - `src/smcb/storage/`: sample construction, resume, reproduce, validation

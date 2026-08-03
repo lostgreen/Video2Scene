@@ -48,5 +48,5 @@ class ProjectConfig:
                 if artifacts_value
                 else project_data_root / "artifacts"
             ).resolve(),
-            blender_bin=values.get("BLENDER_BIN"),
+            blender_bin=values.get("SMCB_BLENDER_BIN") or values.get("BLENDER_BIN"),
         )
