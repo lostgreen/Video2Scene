@@ -26,7 +26,7 @@ def test_doctor_passes_only_complete_pinned_runtime(tmp_path: Path, monkeypatch:
         telemetry_disabled=True,
     )
     monkeypatch.setattr(  # type: ignore[attr-defined]
-        sceneact_doctor, "_git_commit", lambda _root: SCENEACT_PINNED_COMMIT
+        sceneact_doctor, "sceneact_commit", lambda _root: SCENEACT_PINNED_COMMIT
     )
     monkeypatch.setattr(  # type: ignore[attr-defined]
         sceneact_doctor,
@@ -58,7 +58,7 @@ def test_doctor_rejects_commit_drift_and_enabled_telemetry(
         telemetry_disabled=True,
     )
     monkeypatch.setattr(  # type: ignore[attr-defined]
-        sceneact_doctor, "_git_commit", lambda _root: "0" * 40
+        sceneact_doctor, "sceneact_commit", lambda _root: "0" * 40
     )
     monkeypatch.setattr(  # type: ignore[attr-defined]
         sceneact_doctor,

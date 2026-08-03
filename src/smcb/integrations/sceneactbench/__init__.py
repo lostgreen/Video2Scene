@@ -1,6 +1,9 @@
 """SceneActBench compatibility boundary."""
 
 from smcb.integrations.sceneactbench.attribution import (
+    SCENEACT_DATASET_LICENSE,
+    SCENEACT_DATASET_REPOSITORY,
+    SCENEACT_DATASET_REVISION,
     SCENEACT_LICENSE,
     SCENEACT_PINNED_COMMIT,
     SCENEACT_REPOSITORY,
@@ -12,6 +15,9 @@ from smcb.integrations.sceneactbench.doctor import (
 )
 
 __all__ = [
+    "SCENEACT_DATASET_LICENSE",
+    "SCENEACT_DATASET_REPOSITORY",
+    "SCENEACT_DATASET_REVISION",
     "SCENEACT_LICENSE",
     "SCENEACT_PINNED_COMMIT",
     "SCENEACT_REPOSITORY",

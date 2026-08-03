@@ -5,6 +5,9 @@ from pathlib import Path
 
 from smcb.common.config import ProjectConfig
 from smcb.integrations.sceneactbench.attribution import (
+    SCENEACT_DATASET_LICENSE,
+    SCENEACT_DATASET_REPOSITORY,
+    SCENEACT_DATASET_REVISION,
     SCENEACT_LICENSE,
     SCENEACT_PINNED_COMMIT,
     SCENEACT_REPOSITORY,
@@ -21,6 +24,15 @@ def test_sceneact_lock_matches_runtime_attribution() -> None:
     assert lock["repository"] == SCENEACT_REPOSITORY
     assert lock["commit"] == SCENEACT_PINNED_COMMIT
     assert lock["license"] == SCENEACT_LICENSE
+
+    dataset_lock = json.loads(
+        (repository_root / "third_party" / "sceneactbench_dataset.lock.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert dataset_lock["repository"] == SCENEACT_DATASET_REPOSITORY
+    assert dataset_lock["revision"] == SCENEACT_DATASET_REVISION
+    assert dataset_lock["license"] == SCENEACT_DATASET_LICENSE
 
 
 def test_sceneact_defaults_stay_below_project_roots(tmp_path: Path) -> None:

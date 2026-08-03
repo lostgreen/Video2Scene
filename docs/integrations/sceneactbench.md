@@ -36,5 +36,6 @@ or import upstream code into the Video2Scene generation process.
    existing scene compiler.
 
 The next compatibility gate is one official Dynamic sample plus an oracle score through the
-pinned `evaluate_t6(agent_glb, sample_dir)` entry point. Dataset acquisition must remain scoped to
-one scene until that contract is documented and reproducible.
+pinned `evaluate_t6(agent_glb, sample_dir)` entry point. Acquisition is restricted to one scene
+and defaults to the seven-file `oracle` profile. See the exact
+[Dynamic contract](sceneactbench_dynamic_contract.md).

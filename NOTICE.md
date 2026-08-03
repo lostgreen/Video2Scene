@@ -14,5 +14,6 @@ ground truth.
 The SceneActBench repository bundles BlenderMCP, also distributed under the MIT License. Its
 source and notices remain within `third_party/sceneactbench/blender-mcp/`.
 
-SceneActBench datasets are separate artifacts and are not included in this repository. Any
-future downloader must preserve the dataset's own attribution and non-commercial license terms.
+SceneActBench datasets are separate artifacts and are not included in this repository. The
+external Hugging Face dataset revision pinned in `third_party/sceneactbench_dataset.lock.json` is
+licensed CC BY-NC 4.0. The scoped downloader preserves that attribution in every fetched scene.

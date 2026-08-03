@@ -40,7 +40,8 @@ def dependency_available(module: str) -> bool:
         return False
 
 
-def _git_commit(root: Path) -> str | None:
+def sceneact_commit(root: Path) -> str | None:
+    """Resolve the checked-out upstream commit without contacting the network."""
     if not root.is_dir():
         return None
     try:
@@ -92,7 +93,7 @@ def _blender_version(configured_path: str | None) -> tuple[str | None, str | Non
 
 def collect_sceneact_doctor(config: SceneActConfig) -> SceneActDoctorReport:
     """Inspect the pinned harness and minimal Dynamic scorer runtime."""
-    commit = _git_commit(config.root)
+    commit = sceneact_commit(config.root)
     license_kind = _license_kind(config.root)
     metrics_found = (config.root / "src" / "harness" / "metrics_t6.py").is_file()
     blender_path, blender_version, blender_ok = _blender_version(config.blender_bin)

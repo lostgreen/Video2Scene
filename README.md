@@ -48,6 +48,22 @@ third-party code stays behind `src/smcb/integrations/sceneactbench/`, while Scen
 the only GT source. See [the integration boundary](docs/integrations/sceneactbench.md) and the
 [World-Time direction](docs/world_time_direction.md).
 
+Fetch and score only the pinned official Dynamic oracle sample:
+
+```bash
+video2scene sceneact fetch-sample \
+  --scene-id t6l1_platformer_001 \
+  --profile oracle
+video2scene sceneact inspect-sample \
+  --scene-dir "$SCENEACT_DATA_ROOT/benchmark_t6_final/t6l1_platformer_001"
+video2scene sceneact score-oracle \
+  --scene-dir "$SCENEACT_DATA_ROOT/benchmark_t6_final/t6l1_platformer_001"
+```
+
+The default profile downloads only seven scorer-facing files. Use `--profile full` only when the
+reference frames and component library are required. Every fetched scene receives pinned source
+metadata and the external dataset's CC-BY-NC-4.0 notice.
+
 ## External data
 
 Raw assets, normalized assets, previews, frames, and generated datasets are never tracked by

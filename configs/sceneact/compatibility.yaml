@@ -2,6 +2,12 @@ upstream:
   repository: https://github.com/Feinaldo2/SceneActBench.git
   commit: 5b01037454c2ef96c4dea4006b927d27da9d5447
   license: MIT
+dataset:
+  repository: FEInaldo/SceneActBench
+  revision: 128b767d15ffd73e9175773ac7a626846c0b68db
+  license: CC-BY-NC-4.0
+  default_scene_id: t6l1_platformer_001
+  default_fetch_profile: oracle
 dynamic_contract:
   scorer: src/harness/metrics_t6.py
   fps: 24

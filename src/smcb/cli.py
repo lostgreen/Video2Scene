@@ -10,6 +10,7 @@ import sys
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
+from typing import cast
 
 from smcb import __version__
 from smcb.assets.normalizer import normalize_library
@@ -20,6 +21,15 @@ from smcb.dsl.io import load_scene, write_json_schema, write_scene
 from smcb.generation.config import load_dataset_config
 from smcb.generation.sampler import load_asset_index, sample_scene
 from smcb.integrations.sceneactbench import SceneActConfig, collect_sceneact_doctor
+from smcb.integrations.sceneactbench.contracts import FetchProfile
+from smcb.integrations.sceneactbench.samples import (
+    fetch_dynamic_sample,
+    inspect_dynamic_sample,
+)
+from smcb.integrations.sceneactbench.scorer import (
+    score_dynamic_oracle,
+    score_dynamic_prediction,
+)
 from smcb.storage.dataset import build_dataset, reproduce_sample, validate_dataset
 
 
@@ -93,6 +103,13 @@ def _add_asset_common(parser: argparse.ArgumentParser, *, include_limit: bool = 
         parser.add_argument("--limit", type=int, default=30)
 
 
+def _add_sceneact_common(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--project-root", type=Path)
+    parser.add_argument("--sceneact-root", type=Path)
+    parser.add_argument("--data-root", type=Path)
+    parser.add_argument("--blender-bin")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="video2scene")
     parser.add_argument("--version", action="version", version=__version__)
@@ -125,10 +142,30 @@ def build_parser() -> argparse.ArgumentParser:
     sceneact_doctor = sceneact_commands.add_parser(
         "doctor", help="check the pinned harness and minimal Dynamic scorer runtime"
     )
-    sceneact_doctor.add_argument("--project-root", type=Path)
-    sceneact_doctor.add_argument("--sceneact-root", type=Path)
-    sceneact_doctor.add_argument("--data-root", type=Path)
-    sceneact_doctor.add_argument("--blender-bin")
+    _add_sceneact_common(sceneact_doctor)
+    sceneact_fetch = sceneact_commands.add_parser(
+        "fetch-sample", help="fetch one official Dynamic scene at the pinned revision"
+    )
+    _add_sceneact_common(sceneact_fetch)
+    sceneact_fetch.add_argument("--scene-id", required=True)
+    sceneact_fetch.add_argument("--output", type=Path)
+    sceneact_fetch.add_argument("--profile", choices=("oracle", "full"), default="oracle")
+    sceneact_inspect = sceneact_commands.add_parser(
+        "inspect-sample", help="validate one official Dynamic sample contract"
+    )
+    _add_sceneact_common(sceneact_inspect)
+    sceneact_inspect.add_argument("--scene-dir", type=Path, required=True)
+    sceneact_oracle = sceneact_commands.add_parser(
+        "score-oracle", help="score the official GT animated GLB as the prediction"
+    )
+    _add_sceneact_common(sceneact_oracle)
+    sceneact_oracle.add_argument("--scene-dir", type=Path, required=True)
+    sceneact_score = sceneact_commands.add_parser(
+        "score", help="score one animated prediction GLB with the pinned Dynamic scorer"
+    )
+    _add_sceneact_common(sceneact_score)
+    sceneact_score.add_argument("--scene-dir", type=Path, required=True)
+    sceneact_score.add_argument("--prediction", type=Path, required=True)
 
     sample = commands.add_parser("sample-scene", help="write one deterministic Scene Program")
     sample.add_argument("--config", type=Path, default=Path("configs/dataset/scene_smoke.yaml"))
@@ -239,8 +276,6 @@ def _handle_assets(args: argparse.Namespace, config: ProjectConfig) -> int:
 
 
 def _handle_sceneact(args: argparse.Namespace) -> int:
-    if args.sceneact_command != "doctor":
-        raise AssertionError(f"unhandled SceneActBench command: {args.sceneact_command}")
     project = _root_config(args.project_root)
     config = SceneActConfig.from_project(project)
     config = replace(
@@ -249,9 +284,35 @@ def _handle_sceneact(args: argparse.Namespace) -> int:
         data_root=(args.data_root or config.data_root).resolve(),
         blender_bin=args.blender_bin or config.blender_bin,
     )
-    report = collect_sceneact_doctor(config)
-    _print_json(asdict(report))
-    return 0 if report.passed else 1
+    if args.sceneact_command == "doctor":
+        report = collect_sceneact_doctor(config)
+        _print_json(asdict(report))
+        return 0 if report.passed else 1
+    if args.sceneact_command == "fetch-sample":
+        result = fetch_dynamic_sample(
+            scene_id=args.scene_id,
+            output_root=(args.output or config.data_root),
+            profile=cast(FetchProfile, args.profile),
+        )
+        _print_json(result.model_dump(mode="json"))
+        return 0
+    if args.sceneact_command == "inspect-sample":
+        inspection = inspect_dynamic_sample(args.scene_dir)
+        _print_json(inspection.model_dump(mode="json"))
+        return 0 if inspection.passed else 1
+    if args.sceneact_command == "score-oracle":
+        _print_json(score_dynamic_oracle(sceneact_root=config.root, sample_dir=args.scene_dir))
+        return 0
+    if args.sceneact_command == "score":
+        _print_json(
+            score_dynamic_prediction(
+                sceneact_root=config.root,
+                sample_dir=args.scene_dir,
+                prediction_glb=args.prediction,
+            )
+        )
+        return 0
+    raise AssertionError(f"unhandled SceneActBench command: {args.sceneact_command}")
 
 
 def _handle_sample(args: argparse.Namespace, config: ProjectConfig) -> int:
