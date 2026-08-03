@@ -70,6 +70,26 @@ Nested `trajectory`, `semantic`, `layout`, `size`, and `mover_size` objects pres
 matching diagnostics. SceneActBench run directories store `score.json`, `steps.json`, `task.json`,
 and `agent_scene.glb`.
 
+### Observed Official Oracle Baseline
+
+On KML, using the official `gt/gt_scene.glb` as its own prediction produced:
+
+```text
+worst_vehicle_err   0.0029    movable_recall       1.0
+mean_vehicle_err    0.0029    direction_error_rate 0.0
+path_shape_err      0.0037    heading_err           0.0
+scale_error         0.0010    size_error            0.0
+mover_size_err      0.0       layout_err            0.0294
+mover_count_err     3.0
+```
+
+The non-zero mover count is an upstream baseline property, not a wrapper error. The official GLB
+has four animation-driven top-level roots (`Hero`, `Coin_0`, `Coin_1`, `Coin_2`), while
+`trajectory.json` exposes only `Hero` as a mover because coin entries lack `f` and `loc`.
+Consequently the pinned scorer reports `n_agent=4`, `n_gt=1`, and `mover_count_err=3.0`. Local
+packages must be compared with this recorded baseline; the compatibility layer must not patch the
+upstream scorer to hide it.
+
 ## Reproducible Gate
 
 ```bash
