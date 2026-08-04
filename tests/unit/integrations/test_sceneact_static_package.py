@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import struct
 from pathlib import Path
 
 import pytest
@@ -35,6 +36,25 @@ SOURCE_NAMES = (
 )
 
 
+def _glb_bytes(*, root_names: tuple[str, ...] = ("asset",), animated: bool = False) -> bytes:
+    payload: dict[str, object] = {
+        "asset": {"version": "2.0"},
+        "scene": 0,
+        "scenes": [{"nodes": list(range(len(root_names)))}],
+        "nodes": [{"name": name} for name in root_names],
+    }
+    if animated:
+        payload["animations"] = [{"name": "unexpected_static_animation"}]
+    encoded = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    encoded += b" " * ((-len(encoded)) % 4)
+    total_length = 12 + 8 + len(encoded)
+    return (
+        struct.pack("<4sII", b"glTF", 2, total_length)
+        + struct.pack("<I4s", len(encoded), b"JSON")
+        + encoded
+    )
+
+
 def _asset_index(root: Path) -> tuple[AssetIndex, Path]:
     normalized = root / "normalized"
     normalized.mkdir(parents=True)
@@ -42,7 +62,7 @@ def _asset_index(root: Path) -> tuple[AssetIndex, Path]:
     for index, source_name in enumerate(SOURCE_NAMES, start=1):
         asset_id = f"asset_hash_{index:04d}"
         glb_path = normalized / f"{asset_id}.glb"
-        glb_path.write_bytes(b"glTF" + bytes([index]))
+        glb_path.write_bytes(_glb_bytes(root_names=(source_name,)))
         metadata_path = normalized / f"{asset_id}.json"
         metadata_path.write_text("{}\n", encoding="utf-8")
         assets.append(
@@ -109,7 +129,9 @@ def _write_rendered_sample(root: Path) -> Path:
     for frame in range(2, 145):
         os.link(first_frame, sample / "frames" / f"frame_{frame:04d}.png")
     (sample / "input.mp4").write_bytes(b"\x00\x00\x00\x18ftypisomfixture")
-    (sample / "scene.glb").write_bytes(b"glTFscene fixture")
+    (sample / "scene.glb").write_bytes(
+        _glb_bytes(root_names=tuple(item.id for item in scene.objects) + ("CameraLookAt",))
+    )
     (sample / "debug" / "preview.png").write_bytes(b"\x89PNG\r\n\x1a\npreview")
     (sample / "gt" / "camera_sceneact.json").write_text(
         json.dumps(
@@ -203,3 +225,17 @@ def test_validate_static_package_detects_component_tampering(tmp_path: Path) -> 
     assert not inspection.passed
     assert "invalid:glb:components/asset_0001.glb" in inspection.failures
     assert "component_hash:components/asset_0001.glb" in inspection.failures
+
+
+def test_validate_static_package_rejects_assembled_animations(tmp_path: Path) -> None:
+    sample = _write_rendered_sample(tmp_path)
+    output = tmp_path / "t6l1_local_static_003"
+    export_static_package(sample_dir=sample, output_dir=output)
+    meta = json.loads((output / "meta.json").read_text(encoding="utf-8"))
+    root_names = tuple(item["object_id"] for item in meta["components_private"])
+    (output / "gt" / "scene.glb").write_bytes(_glb_bytes(root_names=root_names, animated=True))
+
+    inspection = validate_static_package(output)
+
+    assert not inspection.passed
+    assert "invalid:static_animations:1" in inspection.failures

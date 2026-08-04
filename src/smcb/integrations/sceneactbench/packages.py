@@ -8,6 +8,7 @@ import math
 import os
 import re
 import shutil
+import struct
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -234,6 +235,23 @@ def _has_magic(path: Path, magic: bytes, *, offset: int = 0) -> bool:
         return handle.read(len(magic)) == magic
 
 
+def _read_glb_json(path: Path) -> dict[str, Any]:
+    with path.open("rb") as handle:
+        header = handle.read(20)
+        if len(header) != 20:
+            raise ValueError("truncated GLB header")
+        magic, version, total_length = struct.unpack("<4sII", header[:12])
+        chunk_length, chunk_type = struct.unpack("<I4s", header[12:20])
+        if magic != b"glTF" or version != 2 or total_length != path.stat().st_size:
+            raise ValueError("invalid GLB header")
+        if chunk_type != b"JSON":
+            raise ValueError("first GLB chunk is not JSON")
+        payload = json.loads(handle.read(chunk_length).decode("utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("GLB JSON chunk is not an object")
+    return payload
+
+
 def validate_static_package(scene_dir: Path) -> SceneActPackageInspection:
     """Validate paths, anonymity, cardinalities, metadata, hashes, and file signatures."""
     scene_dir = scene_dir.expanduser().resolve()
@@ -285,9 +303,21 @@ def validate_static_package(scene_dir: Path) -> SceneActPackageInspection:
     if any(path.is_symlink() for path in [*components, *references]):
         failures.append("invalid:symlink_payload")
 
-    for path in [*components, scene_dir / "gt" / "scene.glb"]:
-        if path.is_file() and not _has_magic(path, b"glTF"):
+    component_gltfs: list[dict[str, Any]] = []
+    for path in components:
+        try:
+            component_gltfs.append(_read_glb_json(path))
+        except (OSError, ValueError, json.JSONDecodeError):
             failures.append(f"invalid:glb:{path.relative_to(scene_dir)}")
+    scene_gltf: dict[str, Any] = {}
+    scene_glb = scene_dir / "gt" / "scene.glb"
+    if scene_glb.is_file():
+        try:
+            scene_gltf = _read_glb_json(scene_glb)
+        except (OSError, ValueError, json.JSONDecodeError):
+            failures.append("invalid:glb:gt/scene.glb")
+    if scene_gltf.get("animations"):
+        failures.append(f"invalid:static_animations:{len(scene_gltf['animations'])}")
     for path in references[:1] + [scene_dir / "preview.png"]:
         if path.is_file() and not _has_magic(path, b"\x89PNG\r\n\x1a\n"):
             failures.append(f"invalid:png:{path.relative_to(scene_dir)}")
@@ -329,6 +359,30 @@ def validate_static_package(scene_dir: Path) -> SceneActPackageInspection:
             path = scene_dir / str(item.get("file", ""))
             if not path.is_file() or item.get("sha256") != _sha256(path):
                 failures.append(f"component_hash:{item.get('file', '')}")
+
+    if scene_gltf and isinstance(component_meta, list):
+        expected_root_names = {
+            str(item.get("object_id")) for item in component_meta if isinstance(item, dict)
+        }
+        nodes = scene_gltf.get("nodes", [])
+        scenes = scene_gltf.get("scenes", [])
+        scene_index = int(scene_gltf.get("scene", 0))
+        if (
+            not isinstance(nodes, list)
+            or not isinstance(scenes, list)
+            or scene_index >= len(scenes)
+        ):
+            failures.append("invalid:glb_scene_graph")
+        else:
+            root_indices = scenes[scene_index].get("nodes", [])
+            root_names = {
+                str(nodes[index].get("name", ""))
+                for index in root_indices
+                if isinstance(index, int) and 0 <= index < len(nodes)
+            }
+            missing_roots = sorted(expected_root_names - root_names)
+            if missing_roots:
+                failures.append(f"missing:stable_glb_roots:{','.join(missing_roots)}")
 
     return SceneActPackageInspection(
         scene_id=scene_id,

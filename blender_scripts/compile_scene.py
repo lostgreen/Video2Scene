@@ -394,8 +394,8 @@ def main() -> None:
     bpy.ops.export_scene.gltf(
         filepath=str(args.output / "scene.glb"),
         export_format="GLB",
-        export_animations=True,
-        export_force_sampling=True,
+        export_animations=bool(scene_program["animations"]),
+        export_force_sampling=bool(scene_program["animations"]),
         use_visible=True,
     )
     ground.hide_set(False)
