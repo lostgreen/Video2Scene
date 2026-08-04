@@ -108,19 +108,24 @@ def _asset_index(root: Path) -> tuple[AssetIndex, Path]:
 
 def _dynamic_asset_index(root: Path) -> tuple[AssetIndex, Path]:
     asset_index, index_path = _asset_index(root)
-    glb_path = index_path.parent / "asset_hash_crab.glb"
-    glb_path.write_bytes(_glb_bytes(root_names=("Crab",)))
-    metadata_path = index_path.parent / "asset_hash_crab.json"
-    metadata_path.write_text("{}\n", encoding="utf-8")
-    crab = AssetIndexEntry(
-        asset_id="asset_hash_crab",
-        glb_path=str(glb_path),
-        metadata_path=str(metadata_path),
-        source_relative_path="Platformer/glTF/Crab.gltf",
-        dimensions=(2.5, 1.4, 1.5),
-        animation_clips=[],
-    )
-    asset_index = asset_index.model_copy(update={"assets": [*asset_index.assets, crab]})
+    dynamic_assets = []
+    for source_name in ("Bomb", "Cube_Exclamation"):
+        asset_id = f"asset_hash_{source_name.casefold()}"
+        glb_path = index_path.parent / f"{asset_id}.glb"
+        glb_path.write_bytes(_glb_bytes(root_names=(source_name,)))
+        metadata_path = index_path.parent / f"{asset_id}.json"
+        metadata_path.write_text("{}\n", encoding="utf-8")
+        dynamic_assets.append(
+            AssetIndexEntry(
+                asset_id=asset_id,
+                glb_path=str(glb_path),
+                metadata_path=str(metadata_path),
+                source_relative_path=f"Platformer/glTF/{source_name}.gltf",
+                dimensions=(2.0, 2.0, 2.0),
+                animation_clips=[],
+            )
+        )
+    asset_index = asset_index.model_copy(update={"assets": [*asset_index.assets, *dynamic_assets]})
     index_path.write_text(asset_index.model_dump_json(indent=2) + "\n", encoding="utf-8")
     return asset_index, index_path
 

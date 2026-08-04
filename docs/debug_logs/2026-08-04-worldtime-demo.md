@@ -36,11 +36,18 @@ actions entered the assembled GLB when animation export was enabled. The current
 imported object/data animation before Scene Program tracks are applied; the canonical centroids
 and rendered appearance should remain unchanged.
 
+After stripping those actions, the Dynamic package validator passed, but the pinned scorer oracle
+reported `mean_vehicle_err=0.2287` and `scale_error=0.5229`. Both movers used skinned assets
+(`Bouncer` and `Crab`). Blender GT applies their armature deformation while `metrics_t6.py`
+samples node transforms and static mesh centroids without skin joint matrices. This
+representation mismatch is current; the earlier asset-animation failure is resolved.
+
 ## Next actions
 
-1. Re-render with imported asset animation stripped and verify the only animated GLB roots are the
-   two declared movers.
-2. Export/validate the local Dynamic package and run its oracle through pinned `metrics_t6.py`.
+1. Re-render with the visually distinct rigid `Bomb` and `Cube_Exclamation` assets as movers;
+   verify the only animated GLB roots are the two declared movers.
+2. Export/validate the local Dynamic package and require a near-zero oracle through pinned
+   `metrics_t6.py`.
 3. Generate the four observations and showcase, inspect compact metrics and ffprobe metadata, and
    download the final MP4 for review.
 

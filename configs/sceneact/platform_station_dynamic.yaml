@@ -87,7 +87,7 @@ slots:
     uniform_scale: 0.45
   - id: mover_platform
     role: mover
-    source_name: Bouncer
+    source_name: Cube_Exclamation
     relation: adjacent_to(platform_east)
     position: [4.8, -2.35, 0.0]
     uniform_scale: 0.58
@@ -107,11 +107,11 @@ slots:
     uniform_scale: 0.72
   - id: mover_vehicle
     role: mover
-    source_name: Crab
+    source_name: Bomb
     relation: traverses(transfer_bridge)
     position: [-5.3, -0.1, 2.15]
-    rotation_z_degrees: -90.0
-    uniform_scale: 0.5
+    rotation_z_degrees: 0.0
+    uniform_scale: 0.75
 
 animations:
   - target_id: mover_vehicle
