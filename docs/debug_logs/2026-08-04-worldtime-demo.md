@@ -8,7 +8,7 @@ normal/reverse/freeze/replay observations, timeline GT, automatic mapping scores
 ## Current evidence
 
 - Scene Program v0.2 compiles an 11-component platform station with two rigid movers.
-- KML validation at `f9bfee1`: Ruff, mypy, the full 51-test suite, and CLI help pass.
+- KML validation at `d3192fb`: Ruff, mypy, the full 52-test suite, and CLI help pass.
 - The canonical render has 144 frames at 24 fps, 11/11 visible targets, and mover travel of
   approximately 2.60 m and 10.50 m.
 - The Dynamic package has two animated roots and two dense 144-frame mover trajectories.
