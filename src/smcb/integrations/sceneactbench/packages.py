@@ -708,6 +708,7 @@ def validate_dynamic_package(scene_dir: Path) -> DynamicSceneActPackageInspectio
     if not isinstance(component_meta, list) or len(component_meta) != len(components):
         failures.append("invalid:components_private")
     else:
+        component_mover_ids: list[str] = []
         for item in component_meta:
             if not isinstance(item, dict):
                 failures.append("invalid:component_metadata_record")
@@ -715,6 +716,23 @@ def validate_dynamic_package(scene_dir: Path) -> DynamicSceneActPackageInspectio
             path = scene_dir / str(item.get("file", ""))
             if not path.is_file() or item.get("sha256") != _sha256(path):
                 failures.append(f"component_hash:{item.get('file', '')}")
+            if item.get("scoring_role") != "mover":
+                continue
+            object_id = str(item.get("object_id", ""))
+            component_mover_ids.append(object_id)
+            if not path.is_file():
+                continue
+            try:
+                component_gltf = _read_glb_json(path)
+            except (OSError, ValueError, json.JSONDecodeError):
+                failures.append(f"invalid:mover_component_glb:{object_id}")
+                continue
+            if component_gltf.get("skins"):
+                failures.append(f"invalid:skinned_mover:{object_id}")
+            if component_gltf.get("animations"):
+                failures.append(f"invalid:embedded_mover_animation:{object_id}")
+        if sorted(component_mover_ids) != mover_ids:
+            failures.append("invalid:mover_component_roles")
     if (scene_dir / "gt" / "scene.glb").is_file() and (scene_dir / "gt" / "gt_scene.glb").is_file():
         if _sha256(scene_dir / "gt" / "scene.glb") != _sha256(scene_dir / "gt" / "gt_scene.glb"):
             failures.append("invalid:gt_scene_alias")

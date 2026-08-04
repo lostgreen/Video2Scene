@@ -4,7 +4,7 @@ SceneActBench is pinned at commit `5b01037454c2ef96c4dea4006b927d27da9d5447` and
 used only as an external execution and evaluation harness. Video2Scene's deterministic Scene
 Program remains the sole source of truth for geometry, animation, camera, and dense trajectories.
 
-## Current Gate: Milestone 2
+## Current Gate: Milestone 3 Demo
 
 The repository verifies:
 
@@ -15,6 +15,9 @@ The repository verifies:
 - disabled BlenderMCP telemetry.
 - one pinned official Dynamic oracle sample through the unmodified scorer;
 - a deterministic 10-component local static scene and SceneAct-shaped package.
+- a deterministic 11-component local Dynamic scene with two rigid movers and dense trajectories;
+- a local Dynamic oracle through the same unmodified scorer;
+- four World-Time observations plus timeline GT, automatic metrics, and a 2x2 showcase MP4.
 
 Run:
 
@@ -39,6 +42,6 @@ or import upstream code into the Video2Scene generation process.
 
 The official oracle gate and its scorer assumptions are recorded in the
 [Dynamic contract](sceneactbench_dynamic_contract.md). The local M2 build/export path is recorded
-in the [static package contract](sceneactbench_static_package.md). The next gate adds controlled
-movers and dense SceneAct trajectories to that same platform station; no model or MCP process is
-part of Milestone 2.
+in the [static package contract](sceneactbench_static_package.md). The controlled-mover scene and
+temporal-edit loop are recorded in the [World-Time demo contract](worldtime_demo.md). No model or
+MCP process is part of this demo gate; model submission is the next track.

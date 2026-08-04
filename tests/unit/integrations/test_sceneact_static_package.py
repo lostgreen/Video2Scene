@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import struct
@@ -46,6 +47,7 @@ def _glb_bytes(
     animated: bool = False,
     mesh_root_names: tuple[str, ...] = (),
     animated_root_names: tuple[str, ...] = (),
+    skinned: bool = False,
 ) -> bytes:
     payload: dict[str, object] = {
         "asset": {"version": "2.0"},
@@ -65,6 +67,8 @@ def _glb_bytes(
             }
             for name in driven_names
         ]
+    if skinned:
+        payload["skins"] = [{"joints": []}]
     encoded = json.dumps(payload, separators=(",", ":")).encode("utf-8")
     encoded += b" " * ((-len(encoded)) % 4)
     total_length = 12 + 8 + len(encoded)
@@ -439,3 +443,22 @@ def test_export_dynamic_package_has_exact_mover_contract(tmp_path: Path) -> None
         "mover_vehicle": 144,
     }
     assert (package.gt_scene_glb.parent / "gt_scene.glb").is_file()
+
+
+def test_validate_dynamic_package_rejects_a_skinned_mover(tmp_path: Path) -> None:
+    sample = _write_dynamic_rendered_sample(tmp_path)
+    output = tmp_path / "t6l1_local_dynamic_002"
+    export_dynamic_package(sample_dir=sample, output_dir=output)
+    meta_path = output / "meta.json"
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    mover = next(item for item in meta["components_private"] if item["scoring_role"] == "mover")
+    payload = _glb_bytes(root_names=(mover["object_id"],), skinned=True)
+    component = output / mover["file"]
+    component.write_bytes(payload)
+    mover["sha256"] = hashlib.sha256(payload).hexdigest()
+    meta_path.write_text(json.dumps(meta), encoding="utf-8")
+
+    inspection = validate_dynamic_package(output)
+
+    assert not inspection.passed
+    assert f"invalid:skinned_mover:{mover['object_id']}" in inspection.failures

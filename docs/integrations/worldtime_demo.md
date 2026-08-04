@@ -17,6 +17,11 @@ v0.2. The rollout is fixed at 144 frames, 24 fps, a fixed camera, and exactly tw
 movers. Its GLB export contains the component hierarchy and mover animation; camera, lights, and
 render-only ground are excluded from the scored scene.
 
+The first scorer-compatible track uses visually distinct rigid movers. The package validator
+rejects mover components with glTF skins or embedded clips because the pinned SceneAct scorer
+samples node transforms and static mesh centroids rather than skin joint deformation. Imported
+clips are stripped before the explicit Scene Program tracks are applied.
+
 The command refuses an existing output directory and requires every target to remain visible. It
 also checks that both mover centroids have 144 samples and travel at least one meter.
 
