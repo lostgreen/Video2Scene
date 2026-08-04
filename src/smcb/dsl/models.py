@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import Literal
+from typing import Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -106,6 +106,12 @@ class AnimationTrack(StrictModel):
         return self
 
 
+class MotionTrackV02(AnimationTrack):
+    """Scene Program v0.2 motion track with an explicit scoring boundary."""
+
+    scoring_role: Literal["mover", "static", "ignore"]
+
+
 class RenderSpec(StrictModel):
     engine: Literal["BLENDER_EEVEE_NEXT"] = "BLENDER_EEVEE_NEXT"
     width: int = Field(ge=32, le=4096)
@@ -157,3 +163,42 @@ class SceneProgram(StrictModel):
             if track.keyframes[-1].frame > self.render.frame_end:
                 raise ValueError("animation keyframe lies beyond render range")
         return self
+
+
+class SceneProgramV02(StrictModel):
+    """Multi-mover Scene Program; v0.1 remains accepted without semantic changes."""
+
+    schema_version: Literal["0.2"] = "0.2"
+    sample_id: str
+    seed: int
+    template: Literal["platform_station_dynamic"]
+    coordinate_system: CoordinateSystem = Field(default_factory=CoordinateSystem)
+    objects: list[ObjectSpec] = Field(min_length=1, max_length=20)
+    camera: CameraSpec
+    lighting: LightingSpec
+    animations: list[MotionTrackV02] = Field(default_factory=list, max_length=8)
+    render: RenderSpec
+
+    @model_validator(mode="after")
+    def validate_references(self) -> SceneProgramV02:
+        object_ids = [item.id for item in self.objects]
+        if len(object_ids) != len(set(object_ids)):
+            raise ValueError("object ids must be unique")
+        known_ids = set(object_ids) | {self.camera.id}
+        for item in self.objects:
+            if item.parent_id is not None and item.parent_id not in object_ids:
+                raise ValueError(f"unknown parent_id: {item.parent_id}")
+            if item.parent_id == item.id:
+                raise ValueError("an object cannot parent itself")
+        for track in self.animations:
+            if track.target_id not in known_ids:
+                raise ValueError(f"unknown animation target: {track.target_id}")
+            if track.keyframes[-1].frame > self.render.frame_end:
+                raise ValueError("animation keyframe lies beyond render range")
+        mover_ids = [track.target_id for track in self.animations if track.scoring_role == "mover"]
+        if len(mover_ids) != len(set(mover_ids)):
+            raise ValueError("a mover may have only one scoring track in v0.2")
+        return self
+
+
+AnySceneProgram: TypeAlias = SceneProgram | SceneProgramV02

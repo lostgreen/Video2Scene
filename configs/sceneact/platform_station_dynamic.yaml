@@ -1,0 +1,146 @@
+schema_version: "1.0"
+sample_id: platform_station_dynamic_001
+template: platform_station_dynamic
+seed: 20260805
+
+render:
+  engine: BLENDER_EEVEE_NEXT
+  width: 512
+  height: 512
+  fps: 24
+  frame_start: 1
+  frame_end: 144
+  samples: 24
+
+camera:
+  id: camera
+  type: perspective
+  transform:
+    position: [12.0, -19.0, 10.5]
+    rotation: [0.0, 0.0, 0.0, 1.0]
+    scale: [1.0, 1.0, 1.0]
+  look_at: [0.0, 0.2, 2.1]
+  focal_length_mm: 50.0
+  clip_start: 0.05
+  clip_end: 100.0
+
+lighting:
+  world:
+    color: [0.055, 0.065, 0.08]
+    strength: 0.8
+  lights:
+    - id: sun
+      type: SUN
+      rotation: [0.436332, -0.349066, -0.610865]
+      energy: 2.2
+    - id: key
+      type: AREA
+      position: [4.5, -5.5, 10.0]
+      rotation: [0.314159, 0.0, 0.663225]
+      energy: 950.0
+      size: 6.0
+
+slots:
+  - id: platform_west
+    role: support
+    source_name: Bridge_Modular_Center
+    relation: anchors(west_station)
+    position: [-4.6, 0.7, 0.0]
+    uniform_scale: 0.95
+  - id: platform_east
+    role: support
+    source_name: Bridge_Modular
+    relation: anchors(east_station)
+    position: [4.6, 0.5, 0.0]
+    uniform_scale: 0.95
+  - id: transfer_bridge
+    role: connector
+    source_name: Bridge_Small
+    relation: spans(platform_west,platform_east)
+    position: [0.0, 0.3, 0.08]
+    uniform_scale: 0.95
+  - id: station_gate
+    role: landmark
+    source_name: Door
+    relation: atop(platform_west)
+    position: [-4.6, 0.7, 1.98]
+    uniform_scale: 0.55
+  - id: signal_flag
+    role: landmark
+    source_name: Goal_Flag
+    relation: beside(station_gate)
+    position: [-5.45, 0.0, 1.98]
+    uniform_scale: 0.72
+  - id: defense_cannon
+    role: prop
+    source_name: Cannon
+    relation: atop(platform_east)
+    position: [4.25, 0.95, 1.92]
+    rotation_z_degrees: -20.0
+    uniform_scale: 0.42
+  - id: cargo_chest
+    role: prop
+    source_name: Chest
+    relation: atop(platform_east)
+    position: [4.85, -0.35, 1.92]
+    rotation_z_degrees: 10.0
+    uniform_scale: 0.45
+  - id: mover_platform
+    role: mover
+    source_name: Bouncer
+    relation: adjacent_to(platform_east)
+    position: [4.8, -2.35, 0.0]
+    uniform_scale: 0.58
+  - id: west_barrier
+    role: barrier
+    source_name: Fence_Middle
+    relation: guards(platform_west)
+    position: [-4.25, -0.35, 1.98]
+    rotation_z_degrees: 8.0
+    uniform_scale: 0.7
+  - id: east_barrier
+    role: barrier
+    source_name: Fence_Corner
+    relation: guards(platform_east)
+    position: [5.35, 0.2, 1.92]
+    rotation_z_degrees: -35.0
+    uniform_scale: 0.72
+  - id: mover_vehicle
+    role: mover
+    source_name: Crab
+    relation: traverses(transfer_bridge)
+    position: [-5.3, -0.1, 2.15]
+    rotation_z_degrees: -90.0
+    uniform_scale: 0.5
+
+animations:
+  - target_id: mover_vehicle
+    property: position
+    interpolation: linear
+    space: world
+    scoring_role: mover
+    keyframes:
+      - frame: 1
+        value: [-5.3, -0.1, 2.15]
+      - frame: 36
+        value: [-2.5, -0.1, 2.4]
+      - frame: 72
+        value: [0.0, -0.1, 2.9]
+      - frame: 108
+        value: [2.5, -0.1, 2.4]
+      - frame: 144
+        value: [5.2, -0.1, 2.15]
+  - target_id: mover_platform
+    property: position
+    interpolation: linear
+    space: world
+    scoring_role: mover
+    keyframes:
+      - frame: 1
+        value: [4.8, -2.35, 0.0]
+      - frame: 48
+        value: [4.8, -2.35, 2.6]
+      - frame: 96
+        value: [4.8, -2.35, 0.2]
+      - frame: 144
+        value: [4.8, -2.35, 1.4]

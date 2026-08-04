@@ -273,18 +273,18 @@ def extract_ground_truth(
             evaluated = root.evaluated_get(depsgraph)
             object_matrix = evaluated.matrix_world
             rotation = object_matrix.to_quaternion()
-            trajectories[object_id].append(
-                {
-                    "frame": frame,
-                    "position": list(object_matrix.translation),
-                    "rotation_xyzw": [rotation.x, rotation.y, rotation.z, rotation.w],
-                    "scale": list(object_matrix.to_scale()),
-                }
-            )
-            if frame == scene.frame_start:
-                centroid = evaluated_centroid(root, depsgraph)
-                if centroid is not None:
+            centroid = evaluated_centroid(root, depsgraph)
+            trajectory_record = {
+                "frame": frame,
+                "position": list(object_matrix.translation),
+                "rotation_xyzw": [rotation.x, rotation.y, rotation.z, rotation.w],
+                "scale": list(object_matrix.to_scale()),
+            }
+            if centroid is not None:
+                trajectory_record["centroid"] = list(centroid)
+                if frame == scene.frame_start:
                     layout_objects.append({"name": object_id, "location": list(centroid)})
+            trajectories[object_id].append(trajectory_record)
             bounds = evaluated_bounds(root, depsgraph)
             if bounds is None:
                 visibility_frames[object_id].append(
@@ -391,11 +391,17 @@ def main() -> None:
     )
     bpy.ops.wm.save_as_mainfile(filepath=str(args.output / "scene.blend"))
     ground.hide_set(True)
+    bpy.ops.object.select_all(action="DESELECT")
+    for root in roots.values():
+        for obj in descendants(root):
+            obj.select_set(True)
+    bpy.context.view_layer.objects.active = next(iter(roots.values()))
     bpy.ops.export_scene.gltf(
         filepath=str(args.output / "scene.glb"),
         export_format="GLB",
         export_animations=bool(scene_program["animations"]),
         export_force_sampling=bool(scene_program["animations"]),
+        use_selection=True,
         use_visible=True,
     )
     ground.hide_set(False)

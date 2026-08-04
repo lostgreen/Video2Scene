@@ -117,3 +117,37 @@ def test_oracle_uses_pinned_upstream_entrypoint(tmp_path: Path, monkeypatch: obj
 
     assert score["oracle"] is True
     assert score["agent_glb"] == str(sample / "gt" / "gt_scene.glb")
+
+
+def test_local_dynamic_package_uses_local_validator(tmp_path: Path, monkeypatch: object) -> None:
+    sample = _write_sample(tmp_path, provenance=False)
+    meta_path = sample / "meta.json"
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    meta["evaluation"] = {"sceneact_dynamic_scorer_ready": True}
+    meta_path.write_text(json.dumps(meta), encoding="utf-8")
+    upstream = tmp_path / "sceneactbench"
+    metrics = upstream / "src" / "harness" / "metrics_t6.py"
+    metrics.parent.mkdir(parents=True)
+    metrics.write_text(
+        "def evaluate_t6(agent_glb, sample_dir):\n"
+        "    return {'agent_glb': agent_glb, 'sample_dir': sample_dir, 'local': True}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(  # type: ignore[attr-defined]
+        sceneact_scorer, "sceneact_commit", lambda _root: SCENEACT_PINNED_COMMIT
+    )
+    monkeypatch.setattr(  # type: ignore[attr-defined]
+        sceneact_scorer,
+        "validate_dynamic_package",
+        lambda path: type(
+            "Inspection", (), {"passed": True, "failures": [], "scene_dir": str(path)}
+        )(),
+    )
+
+    score = sceneact_scorer.score_dynamic_oracle(
+        sceneact_root=upstream,
+        sample_dir=sample,
+    )
+
+    assert score["local"] is True
+    assert score["sample_dir"] == str(sample.resolve())

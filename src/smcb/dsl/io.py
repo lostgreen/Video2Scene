@@ -5,15 +5,20 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from smcb.dsl.models import SceneProgram
+from smcb.dsl.models import AnySceneProgram, SceneProgram, SceneProgramV02
 
 
-def load_scene(path: Path) -> SceneProgram:
+def load_scene(path: Path) -> AnySceneProgram:
     """Read and validate one Scene Program JSON file."""
-    return SceneProgram.model_validate_json(path.read_text(encoding="utf-8"))
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"expected a Scene Program JSON object: {path}")
+    if payload.get("schema_version") == "0.2":
+        return SceneProgramV02.model_validate(payload)
+    return SceneProgram.model_validate(payload)
 
 
-def write_scene(scene: SceneProgram, path: Path) -> None:
+def write_scene(scene: AnySceneProgram, path: Path) -> None:
     """Write canonical, human-readable Scene Program JSON."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -27,5 +32,14 @@ def write_json_schema(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(SceneProgram.model_json_schema(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def write_json_schema_v02(path: Path) -> None:
+    """Materialize the Scene Program v0.2 JSON Schema."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(SceneProgramV02.model_json_schema(), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )

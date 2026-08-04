@@ -12,11 +12,14 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from smcb.assets.models import AssetIndex, AssetIndexEntry
 from smcb.dsl.models import (
+    AnySceneProgram,
     CameraSpec,
     LightingSpec,
+    MotionTrackV02,
     ObjectSpec,
     RenderSpec,
     SceneProgram,
+    SceneProgramV02,
     Transform,
     Vector3,
 )
@@ -58,15 +61,53 @@ class PlatformStationBlueprint(BlueprintModel):
         return self
 
 
+class DynamicPlatformStationBlueprint(BlueprintModel):
+    schema_version: Literal["1.0"] = "1.0"
+    sample_id: str = Field(min_length=1)
+    template: Literal["platform_station_dynamic"]
+    seed: int
+    render: RenderSpec
+    camera: CameraSpec
+    lighting: LightingSpec
+    slots: list[BlueprintSlot] = Field(min_length=6, max_length=20)
+    animations: list[MotionTrackV02] = Field(min_length=2, max_length=8)
+
+    @model_validator(mode="after")
+    def validate_dynamic_contract(self) -> DynamicPlatformStationBlueprint:
+        slot_ids = [slot.id for slot in self.slots]
+        if len(slot_ids) != len(set(slot_ids)):
+            raise ValueError("blueprint slot ids must be unique")
+        frame_count = self.render.frame_end - self.render.frame_start + 1
+        if self.render.fps != 24 or frame_count != 144:
+            raise ValueError("SceneAct dynamic blueprints require 24 fps and 144 frames")
+        if any(track.target_id == self.camera.id for track in self.animations):
+            raise ValueError("the compatibility camera must remain fixed")
+        if any(track.target_id not in slot_ids for track in self.animations):
+            raise ValueError("dynamic blueprint tracks must target component slots")
+        mover_tracks = [
+            track
+            for track in self.animations
+            if track.scoring_role == "mover" and track.property == "position"
+        ]
+        if len(mover_tracks) != 2:
+            raise ValueError("the first dynamic blueprint requires two translation movers")
+        return self
+
+
+AnyPlatformStationBlueprint = PlatformStationBlueprint | DynamicPlatformStationBlueprint
+
+
 @dataclass(frozen=True)
 class ResolvedBlueprintSlot:
     slot: BlueprintSlot
     asset: AssetIndexEntry
 
 
-def load_platform_station_blueprint(path: Path) -> PlatformStationBlueprint:
+def load_platform_station_blueprint(path: Path) -> AnyPlatformStationBlueprint:
     """Load a strict private blueprint; semantic roles never enter public filenames."""
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if isinstance(payload, dict) and payload.get("template") == "platform_station_dynamic":
+        return DynamicPlatformStationBlueprint.model_validate(payload)
     return PlatformStationBlueprint.model_validate(payload)
 
 
@@ -75,7 +116,7 @@ def _source_stem(entry: AssetIndexEntry) -> str:
 
 
 def resolve_blueprint_slots(
-    blueprint: PlatformStationBlueprint, asset_index: AssetIndex
+    blueprint: AnyPlatformStationBlueprint, asset_index: AssetIndex
 ) -> tuple[ResolvedBlueprintSlot, ...]:
     """Resolve source stems instead of embedding machine-specific asset hashes."""
     resolved: list[ResolvedBlueprintSlot] = []
@@ -99,9 +140,9 @@ def _z_rotation(degrees: float) -> tuple[float, float, float, float]:
 
 
 def build_platform_station_scene(
-    blueprint: PlatformStationBlueprint, asset_index: AssetIndex
-) -> SceneProgram:
-    """Compile the explicit platform-station layout into Scene Program v0.1."""
+    blueprint: AnyPlatformStationBlueprint, asset_index: AssetIndex
+) -> AnySceneProgram:
+    """Compile an explicit platform-station layout into its versioned Scene Program."""
     objects = []
     for resolved in resolve_blueprint_slots(blueprint, asset_index):
         slot = resolved.slot
@@ -118,13 +159,24 @@ def build_platform_station_scene(
                 ),
             )
         )
+    if isinstance(blueprint, DynamicPlatformStationBlueprint):
+        return SceneProgramV02(
+            sample_id=blueprint.sample_id,
+            template=blueprint.template,
+            seed=blueprint.seed,
+            objects=objects,
+            camera=blueprint.camera,
+            lighting=blueprint.lighting,
+            render=blueprint.render,
+            animations=blueprint.animations,
+        )
     return SceneProgram(
         sample_id=blueprint.sample_id,
-        seed=blueprint.seed,
         template=blueprint.template,
+        seed=blueprint.seed,
         objects=objects,
         camera=blueprint.camera,
         lighting=blueprint.lighting,
-        animations=[],
         render=blueprint.render,
+        animations=[],
     )

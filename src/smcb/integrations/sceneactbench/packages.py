@@ -15,8 +15,12 @@ from typing import Any
 
 from smcb.dsl.io import load_scene
 from smcb.generation.sampler import load_asset_index
-from smcb.integrations.sceneactbench.builder import inspect_static_render
+from smcb.integrations.sceneactbench.builder import (
+    inspect_dynamic_render,
+    inspect_static_render,
+)
 from smcb.integrations.sceneactbench.contracts import (
+    DynamicSceneActPackageInspection,
     SceneActDynamicPackage,
     SceneActPackageInspection,
 )
@@ -67,6 +71,7 @@ def package_from_scene_dir(scene_dir: Path) -> SceneActDynamicPackage:
     """Resolve typed paths from a package root without reading large payloads."""
     scene_dir = scene_dir.expanduser().resolve()
     meta = _json_object(scene_dir / "meta.json")
+    dynamic_gt_scene = scene_dir / "gt" / "gt_scene.glb"
     return SceneActDynamicPackage(
         scene_id=str(meta.get("sample_id", scene_dir.name)),
         fps=int(meta.get("fps", 0)),
@@ -74,7 +79,9 @@ def package_from_scene_dir(scene_dir: Path) -> SceneActDynamicPackage:
         components_dir=scene_dir / "components",
         reference_dir=scene_dir / "reference",
         reference_video=scene_dir / "reference.mp4",
-        gt_scene_glb=scene_dir / "gt" / "scene.glb",
+        gt_scene_glb=(
+            dynamic_gt_scene if dynamic_gt_scene.is_file() else scene_dir / "gt" / "scene.glb"
+        ),
         trajectory_json=scene_dir / "gt" / "trajectory.json",
         layout_gt_json=scene_dir / "layout_gt.json",
         camera_json=scene_dir / "camera.json",
@@ -414,6 +421,315 @@ def validate_static_package(scene_dir: Path) -> SceneActPackageInspection:
         reference_frame_count=len(references),
         layout_object_count=len(layout_objects),
         mover_count=len(trajectory),
+        failures=failures,
+        passed=not failures,
+    )
+
+
+def export_dynamic_package(
+    *,
+    sample_dir: Path,
+    output_dir: Path,
+    min_visible_pixel_ratio: float = 0.0005,
+) -> SceneActDynamicPackage:
+    """Export the two-mover canonical master in the pinned Dynamic contract."""
+    sample_dir = sample_dir.expanduser().resolve()
+    output_dir = output_dir.expanduser().resolve()
+    if output_dir.exists():
+        raise FileExistsError(f"SceneAct package output already exists: {output_dir}")
+    scene_id = validate_scene_id(output_dir.name)
+    scene = load_scene(sample_dir / "scene.json")
+    if scene.schema_version != "0.2" or scene.template != "platform_station_dynamic":
+        raise ValueError("dynamic package export requires platform_station_dynamic v0.2")
+    mover_ids = sorted(
+        track.target_id
+        for track in scene.animations
+        if getattr(track, "scoring_role", None) == "mover"
+    )
+    if len(mover_ids) != 2:
+        raise ValueError("dynamic package export requires exactly two scoring movers")
+    inspection = inspect_dynamic_render(sample_dir, min_visible_pixel_ratio=min_visible_pixel_ratio)
+    if not inspection.passed:
+        raise ValueError(f"dynamic render failed gate: {inspection.failures}")
+
+    build_manifest = _json_object(sample_dir / "sceneact_build.json")
+    asset_index = load_asset_index(Path(str(build_manifest["asset_index_path"])))
+    assets_by_id = {entry.asset_id: entry for entry in asset_index.assets}
+    slot_records = build_manifest.get("slots")
+    if not isinstance(slot_records, list):
+        raise ValueError("sceneact_build.json does not contain a slots list")
+    slots_by_object = {
+        str(record["object_id"]): record for record in slot_records if isinstance(record, dict)
+    }
+    if set(slots_by_object) != {item.id for item in scene.objects}:
+        raise ValueError("build manifest slots do not match Scene Program objects")
+    source_frames = sorted((sample_dir / "frames").glob("frame_*.png"))
+    frame_count = scene.render.frame_end - scene.render.frame_start + 1
+    if len(source_frames) != frame_count:
+        raise ValueError(f"source frame count mismatch: {len(source_frames)} != {frame_count}")
+
+    output_dir.mkdir(parents=True)
+    components_dir = output_dir / "components"
+    reference_dir = output_dir / "reference"
+    gt_dir = output_dir / "gt"
+    components_dir.mkdir()
+    reference_dir.mkdir()
+    gt_dir.mkdir()
+    component_meta: list[dict[str, Any]] = []
+    for index, object_spec in enumerate(scene.objects, start=1):
+        asset = assets_by_id[object_spec.asset_id]
+        source = Path(asset.glb_path)
+        anonymous_name = f"asset_{index:04d}.glb"
+        destination = components_dir / anonymous_name
+        _copy(source, destination)
+        slot = slots_by_object[object_spec.id]
+        component_meta.append(
+            {
+                "file": f"components/{anonymous_name}",
+                "sha256": _sha256(destination),
+                "object_id": object_spec.id,
+                "asset_id": object_spec.asset_id,
+                "source_name": slot["source_name"],
+                "role": slot["role"],
+                "relation": slot["relation"],
+                "scoring_role": slot.get("scoring_role", "static"),
+            }
+        )
+    for source in source_frames:
+        _link_or_copy(source, reference_dir / source.name)
+    _copy(sample_dir / "input.mp4", output_dir / "reference.mp4")
+    _copy(sample_dir / "scene.glb", gt_dir / "scene.glb")
+    _link_or_copy(gt_dir / "scene.glb", gt_dir / "gt_scene.glb")
+    _copy(sample_dir / "debug" / "preview.png", output_dir / "preview.png")
+    _copy(sample_dir / "gt" / "camera_sceneact.json", output_dir / "camera.json")
+
+    dense_trajectories = _json_object(sample_dir / "gt" / "trajectories.json")
+    trajectory_payload: dict[str, list[dict[str, Any]]] = {}
+    for mover_id in mover_ids:
+        records = dense_trajectories.get(mover_id)
+        if not isinstance(records, list) or len(records) != frame_count:
+            raise ValueError(f"invalid dense mover trajectory: {mover_id}")
+        trajectory_payload[mover_id] = [
+            {"f": int(record["frame"]), "loc": record["centroid"]} for record in records
+        ]
+    (gt_dir / "trajectory.json").write_text(
+        json.dumps(trajectory_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+    layout_source = _json_object(sample_dir / "gt" / "layout.json")
+    source_objects = layout_source.get("objects")
+    if not isinstance(source_objects, list):
+        raise ValueError("compiled gt/layout.json does not contain an objects list")
+    source_by_name = {str(item["name"]): item for item in source_objects if isinstance(item, dict)}
+    layout_objects: list[dict[str, Any]] = []
+    for object_spec in scene.objects:
+        if object_spec.id in mover_ids:
+            continue
+        slot = slots_by_object[object_spec.id]
+        layout_objects.append(
+            {
+                "name": object_spec.id,
+                "type": slot["role"],
+                "location": source_by_name[object_spec.id]["location"],
+                "scale": object_spec.transform.scale[0],
+                "rotZ_deg": round(_yaw_degrees(object_spec.transform.rotation), 6),
+            }
+        )
+    type_counts = Counter(str(item["type"]) for item in layout_objects)
+    (output_dir / "layout_gt.json").write_text(
+        json.dumps(
+            {
+                "sample_id": scene_id,
+                "n_static_objects": len(layout_objects),
+                "type_counts": dict(sorted(type_counts.items())),
+                "objects": layout_objects,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    meta = {
+        "schema_version": "1.0",
+        "sample_id": scene_id,
+        "source_sample_id": scene.sample_id,
+        "task": "task6_anim",
+        "level": 1,
+        "level_name": "local_platform_station_dynamic",
+        "scene": scene.template,
+        "n_frames": frame_count,
+        "fps": scene.render.fps,
+        "coordinate_system": scene.coordinate_system.model_dump(mode="json"),
+        "movers": mover_ids,
+        "static_decor": [item.id for item in scene.objects if item.id not in mover_ids],
+        "evaluation": {"static_only": False, "sceneact_dynamic_scorer_ready": True},
+        "generator": {
+            "git_commit": build_manifest.get("git_commit", "unknown"),
+            "blueprint_sha256": build_manifest.get("blueprint_sha256"),
+            "asset_pack": asset_index.pack_id,
+            "asset_manifest_hash": asset_index.asset_manifest_hash,
+        },
+        "components_private": component_meta,
+    }
+    (output_dir / "meta.json").write_text(
+        json.dumps(meta, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    package = package_from_scene_dir(output_dir)
+    package_inspection = validate_dynamic_package(output_dir)
+    if not package_inspection.passed:
+        raise RuntimeError(
+            f"exported Dynamic package failed validation: {', '.join(package_inspection.failures)}"
+        )
+    return package
+
+
+def _animated_top_level_roots(gltf: dict[str, Any]) -> set[str]:
+    nodes = gltf.get("nodes", [])
+    scenes = gltf.get("scenes", [])
+    scene_index = int(gltf.get("scene", 0))
+    if not isinstance(nodes, list) or not isinstance(scenes, list) or scene_index >= len(scenes):
+        return set()
+    root_indices = set(scenes[scene_index].get("nodes", []))
+    parents: dict[int, int] = {}
+    for parent_index, node in enumerate(nodes):
+        for child in node.get("children", []):
+            if isinstance(child, int):
+                parents[child] = parent_index
+    driven: set[int] = set()
+    for animation in gltf.get("animations", []):
+        for channel in animation.get("channels", []):
+            node_index = channel.get("target", {}).get("node")
+            if isinstance(node_index, int):
+                while node_index not in root_indices and node_index in parents:
+                    node_index = parents[node_index]
+                if node_index in root_indices:
+                    driven.add(node_index)
+    return {str(nodes[index].get("name", "")) for index in driven}
+
+
+def validate_dynamic_package(scene_dir: Path) -> DynamicSceneActPackageInspection:
+    """Validate the exact two-mover SceneAct package without invoking Blender."""
+    scene_dir = scene_dir.expanduser().resolve()
+    failures: list[str] = []
+    try:
+        meta = _json_object(scene_dir / "meta.json")
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        meta = {}
+        failures.append(f"invalid:meta.json:{type(error).__name__}")
+    scene_id = str(meta.get("sample_id", scene_dir.name))
+    try:
+        validate_scene_id(scene_id)
+    except ValueError:
+        failures.append(f"invalid:scene_id:{scene_id}")
+    if scene_id != scene_dir.name:
+        failures.append(f"sample_id_mismatch:{scene_id}:{scene_dir.name}")
+    fps = int(meta.get("fps", 0))
+    frame_count = int(meta.get("n_frames", 0))
+    if fps != 24:
+        failures.append(f"invalid:fps:{fps}")
+    if frame_count != 144:
+        failures.append(f"invalid:n_frames:{frame_count}")
+    required = (
+        "reference.mp4",
+        "gt/scene.glb",
+        "gt/gt_scene.glb",
+        "gt/trajectory.json",
+        "camera.json",
+        "layout_gt.json",
+        "meta.json",
+        "preview.png",
+    )
+    failures.extend(
+        f"missing:{relative}" for relative in required if not (scene_dir / relative).is_file()
+    )
+    components = sorted((scene_dir / "components").glob("*.glb"))
+    references = sorted((scene_dir / "reference").glob("*.png"))
+    if not 6 <= len(components) <= 20:
+        failures.append(f"component_count:{len(components)}")
+    if [path.name for path in components] != [
+        f"asset_{index:04d}.glb" for index in range(1, len(components) + 1)
+    ]:
+        failures.append("invalid:component_names")
+    if [path.name for path in references] != [
+        f"frame_{frame:04d}.png" for frame in range(1, frame_count + 1)
+    ]:
+        failures.append(f"reference_frame_count:{len(references)}:{frame_count}")
+
+    scene_gltf: dict[str, Any] = {}
+    try:
+        scene_gltf = _read_glb_json(scene_dir / "gt" / "scene.glb")
+    except (OSError, ValueError, json.JSONDecodeError):
+        failures.append("invalid:glb:gt/scene.glb")
+    animation_count = len(scene_gltf.get("animations", []))
+    if animation_count == 0:
+        failures.append("invalid:no_animations")
+    animated_roots = sorted(_animated_top_level_roots(scene_gltf))
+    mover_ids = sorted(str(item) for item in meta.get("movers", []))
+    if animated_roots != mover_ids:
+        failures.append(f"animated_root_mismatch:{','.join(animated_roots)}:{','.join(mover_ids)}")
+
+    try:
+        trajectory = _json_object(scene_dir / "gt" / "trajectory.json")
+        layout = _json_object(scene_dir / "layout_gt.json")
+        camera = _json_object(scene_dir / "camera.json")
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        trajectory, layout, camera = {}, {}, {}
+        failures.append(f"invalid:package_json:{type(error).__name__}")
+    trajectory_counts: dict[str, int] = {}
+    if sorted(trajectory) != mover_ids or len(mover_ids) != 2:
+        failures.append("invalid:mover_trajectory_names")
+    for mover_id, records in trajectory.items():
+        if not isinstance(records, list):
+            failures.append(f"invalid:trajectory:{mover_id}")
+            continue
+        trajectory_counts[mover_id] = len(records)
+        frames = [record.get("f") for record in records if isinstance(record, dict)]
+        if frames != list(range(1, frame_count + 1)):
+            failures.append(f"trajectory_frame_count:{mover_id}:{len(records)}")
+        if any(
+            not isinstance(record.get("loc"), list) or len(record["loc"]) != 3
+            for record in records
+            if isinstance(record, dict)
+        ):
+            failures.append(f"invalid:trajectory_location:{mover_id}")
+    layout_objects = layout.get("objects", [])
+    if not isinstance(layout_objects, list):
+        layout_objects = []
+        failures.append("invalid:layout_objects")
+    if len(layout_objects) != len(components) - len(mover_ids):
+        failures.append(
+            f"layout_object_count:{len(layout_objects)}:{len(components) - len(mover_ids)}"
+        )
+    camera_keys = {"name", "type", "location", "rotation_euler_deg", "lens_mm", "matrix_world"}
+    if not camera_keys.issubset(camera):
+        failures.append("invalid:camera_contract")
+    component_meta = meta.get("components_private", [])
+    if not isinstance(component_meta, list) or len(component_meta) != len(components):
+        failures.append("invalid:components_private")
+    else:
+        for item in component_meta:
+            if not isinstance(item, dict):
+                failures.append("invalid:component_metadata_record")
+                continue
+            path = scene_dir / str(item.get("file", ""))
+            if not path.is_file() or item.get("sha256") != _sha256(path):
+                failures.append(f"component_hash:{item.get('file', '')}")
+    if (scene_dir / "gt" / "scene.glb").is_file() and (scene_dir / "gt" / "gt_scene.glb").is_file():
+        if _sha256(scene_dir / "gt" / "scene.glb") != _sha256(scene_dir / "gt" / "gt_scene.glb"):
+            failures.append("invalid:gt_scene_alias")
+    return DynamicSceneActPackageInspection(
+        scene_id=scene_id,
+        scene_dir=scene_dir,
+        fps=fps,
+        frame_count=frame_count,
+        component_count=len(components),
+        reference_frame_count=len(references),
+        layout_object_count=len(layout_objects),
+        mover_count=len(trajectory),
+        animation_count=animation_count,
+        animated_root_names=animated_roots,
+        trajectory_frame_counts=trajectory_counts,
         failures=failures,
         passed=not failures,
     )

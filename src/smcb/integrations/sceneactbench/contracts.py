@@ -63,6 +63,22 @@ class StaticSceneBuildResult(BaseModel):
     inspection: StaticRenderInspection
 
 
+class DynamicRenderInspection(StaticRenderInspection):
+    """Visibility and motion gate for the two-mover canonical master."""
+
+    mover_ids: list[str]
+    mover_motion_distances: dict[str, float]
+
+
+class DynamicSceneBuildResult(BaseModel):
+    sample_id: str
+    sample_dir: Path
+    scene_program: Path
+    reference_video: Path
+    preview: Path
+    inspection: DynamicRenderInspection
+
+
 class SceneActDynamicPackage(BaseModel):
     """Filesystem contract shared by static M2 and later dynamic scenes."""
 
@@ -93,3 +109,9 @@ class SceneActPackageInspection(BaseModel):
     mover_count: int = Field(ge=0)
     failures: list[str]
     passed: bool
+
+
+class DynamicSceneActPackageInspection(SceneActPackageInspection):
+    animation_count: int = Field(ge=0)
+    animated_root_names: list[str]
+    trajectory_frame_counts: dict[str, int]

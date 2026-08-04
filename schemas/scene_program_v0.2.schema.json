@@ -1,0 +1,567 @@
+{
+  "$defs": {
+    "CameraSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "clip_end": {
+          "default": 100.0,
+          "exclusiveMinimum": 0,
+          "title": "Clip End",
+          "type": "number"
+        },
+        "clip_start": {
+          "default": 0.05,
+          "exclusiveMinimum": 0,
+          "title": "Clip Start",
+          "type": "number"
+        },
+        "focal_length_mm": {
+          "default": 50.0,
+          "exclusiveMinimum": 0,
+          "title": "Focal Length Mm",
+          "type": "number"
+        },
+        "id": {
+          "default": "camera",
+          "title": "Id",
+          "type": "string"
+        },
+        "look_at": {
+          "default": [
+            0.0,
+            0.0,
+            0.8
+          ],
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Look At",
+          "type": "array"
+        },
+        "ortho_scale": {
+          "default": 6.0,
+          "exclusiveMinimum": 0,
+          "title": "Ortho Scale",
+          "type": "number"
+        },
+        "transform": {
+          "$ref": "#/$defs/Transform"
+        },
+        "type": {
+          "default": "perspective",
+          "enum": [
+            "perspective",
+            "orthographic"
+          ],
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "transform"
+      ],
+      "title": "CameraSpec",
+      "type": "object"
+    },
+    "CoordinateSystem": {
+      "additionalProperties": false,
+      "properties": {
+        "forward": {
+          "const": "-Y",
+          "default": "-Y",
+          "title": "Forward",
+          "type": "string"
+        },
+        "handedness": {
+          "const": "right",
+          "default": "right",
+          "title": "Handedness",
+          "type": "string"
+        },
+        "quaternion_order": {
+          "const": "xyzw",
+          "default": "xyzw",
+          "title": "Quaternion Order",
+          "type": "string"
+        },
+        "units": {
+          "const": "meters",
+          "default": "meters",
+          "title": "Units",
+          "type": "string"
+        },
+        "up": {
+          "const": "Z",
+          "default": "Z",
+          "title": "Up",
+          "type": "string"
+        }
+      },
+      "title": "CoordinateSystem",
+      "type": "object"
+    },
+    "Keyframe": {
+      "additionalProperties": false,
+      "properties": {
+        "frame": {
+          "minimum": 1,
+          "title": "Frame",
+          "type": "integer"
+        },
+        "value": {
+          "items": {
+            "type": "number"
+          },
+          "title": "Value",
+          "type": "array"
+        }
+      },
+      "required": [
+        "frame",
+        "value"
+      ],
+      "title": "Keyframe",
+      "type": "object"
+    },
+    "LightSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "energy": {
+          "exclusiveMinimum": 0,
+          "title": "Energy",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "position": {
+          "default": [
+            0.0,
+            0.0,
+            5.0
+          ],
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Position",
+          "type": "array"
+        },
+        "rotation": {
+          "default": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Rotation",
+          "type": "array"
+        },
+        "size": {
+          "default": 5.0,
+          "exclusiveMinimum": 0,
+          "title": "Size",
+          "type": "number"
+        },
+        "type": {
+          "enum": [
+            "SUN",
+            "AREA"
+          ],
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "energy"
+      ],
+      "title": "LightSpec",
+      "type": "object"
+    },
+    "LightingSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "lights": {
+          "items": {
+            "$ref": "#/$defs/LightSpec"
+          },
+          "minItems": 1,
+          "title": "Lights",
+          "type": "array"
+        },
+        "world": {
+          "$ref": "#/$defs/WorldSpec"
+        }
+      },
+      "required": [
+        "lights"
+      ],
+      "title": "LightingSpec",
+      "type": "object"
+    },
+    "MotionTrackV02": {
+      "additionalProperties": false,
+      "description": "Scene Program v0.2 motion track with an explicit scoring boundary.",
+      "properties": {
+        "interpolation": {
+          "const": "linear",
+          "default": "linear",
+          "title": "Interpolation",
+          "type": "string"
+        },
+        "keyframes": {
+          "items": {
+            "$ref": "#/$defs/Keyframe"
+          },
+          "minItems": 2,
+          "title": "Keyframes",
+          "type": "array"
+        },
+        "property": {
+          "enum": [
+            "position",
+            "rotation"
+          ],
+          "title": "Property",
+          "type": "string"
+        },
+        "scoring_role": {
+          "enum": [
+            "mover",
+            "static",
+            "ignore"
+          ],
+          "title": "Scoring Role",
+          "type": "string"
+        },
+        "space": {
+          "default": "local",
+          "enum": [
+            "local",
+            "world"
+          ],
+          "title": "Space",
+          "type": "string"
+        },
+        "target_id": {
+          "title": "Target Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target_id",
+        "property",
+        "keyframes",
+        "scoring_role"
+      ],
+      "title": "MotionTrackV02",
+      "type": "object"
+    },
+    "ObjectSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "asset_id": {
+          "minLength": 1,
+          "title": "Asset Id",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        },
+        "target": {
+          "default": true,
+          "title": "Target",
+          "type": "boolean"
+        },
+        "transform": {
+          "$ref": "#/$defs/Transform"
+        }
+      },
+      "required": [
+        "id",
+        "asset_id"
+      ],
+      "title": "ObjectSpec",
+      "type": "object"
+    },
+    "RenderSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "engine": {
+          "const": "BLENDER_EEVEE_NEXT",
+          "default": "BLENDER_EEVEE_NEXT",
+          "title": "Engine",
+          "type": "string"
+        },
+        "fps": {
+          "maximum": 120,
+          "minimum": 1,
+          "title": "Fps",
+          "type": "integer"
+        },
+        "frame_end": {
+          "minimum": 1,
+          "title": "Frame End",
+          "type": "integer"
+        },
+        "frame_start": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Frame Start",
+          "type": "integer"
+        },
+        "height": {
+          "maximum": 4096,
+          "minimum": 32,
+          "title": "Height",
+          "type": "integer"
+        },
+        "samples": {
+          "default": 16,
+          "maximum": 256,
+          "minimum": 1,
+          "title": "Samples",
+          "type": "integer"
+        },
+        "width": {
+          "maximum": 4096,
+          "minimum": 32,
+          "title": "Width",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "width",
+        "height",
+        "fps",
+        "frame_end"
+      ],
+      "title": "RenderSpec",
+      "type": "object"
+    },
+    "Transform": {
+      "additionalProperties": false,
+      "properties": {
+        "position": {
+          "default": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Position",
+          "type": "array"
+        },
+        "rotation": {
+          "default": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Rotation",
+          "type": "array"
+        },
+        "scale": {
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Scale",
+          "type": "array"
+        }
+      },
+      "title": "Transform",
+      "type": "object"
+    },
+    "WorldSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "default": [
+            0.055,
+            0.065,
+            0.08
+          ],
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Color",
+          "type": "array"
+        },
+        "strength": {
+          "default": 0.8,
+          "minimum": 0,
+          "title": "Strength",
+          "type": "number"
+        }
+      },
+      "title": "WorldSpec",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Multi-mover Scene Program; v0.1 remains accepted without semantic changes.",
+  "properties": {
+    "animations": {
+      "items": {
+        "$ref": "#/$defs/MotionTrackV02"
+      },
+      "maxItems": 8,
+      "title": "Animations",
+      "type": "array"
+    },
+    "camera": {
+      "$ref": "#/$defs/CameraSpec"
+    },
+    "coordinate_system": {
+      "$ref": "#/$defs/CoordinateSystem"
+    },
+    "lighting": {
+      "$ref": "#/$defs/LightingSpec"
+    },
+    "objects": {
+      "items": {
+        "$ref": "#/$defs/ObjectSpec"
+      },
+      "maxItems": 20,
+      "minItems": 1,
+      "title": "Objects",
+      "type": "array"
+    },
+    "render": {
+      "$ref": "#/$defs/RenderSpec"
+    },
+    "sample_id": {
+      "title": "Sample Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "0.2",
+      "default": "0.2",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "seed": {
+      "title": "Seed",
+      "type": "integer"
+    },
+    "template": {
+      "const": "platform_station_dynamic",
+      "title": "Template",
+      "type": "string"
+    }
+  },
+  "required": [
+    "sample_id",
+    "seed",
+    "template",
+    "objects",
+    "camera",
+    "lighting",
+    "render"
+  ],
+  "title": "SceneProgramV02",
+  "type": "object"
+}

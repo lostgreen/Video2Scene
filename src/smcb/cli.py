@@ -17,14 +17,16 @@ from smcb.assets.normalizer import normalize_library
 from smcb.assets.source import fetch_source, load_source_manifest, source_status
 from smcb.blender.runner import render_scene
 from smcb.common.config import ProjectConfig
-from smcb.dsl.io import load_scene, write_json_schema, write_scene
+from smcb.dsl.io import load_scene, write_json_schema, write_json_schema_v02, write_scene
 from smcb.generation.config import load_dataset_config
 from smcb.generation.sampler import load_asset_index, sample_scene
 from smcb.integrations.sceneactbench import SceneActConfig, collect_sceneact_doctor
-from smcb.integrations.sceneactbench.builder import build_static_scene
+from smcb.integrations.sceneactbench.builder import build_dynamic_scene, build_static_scene
 from smcb.integrations.sceneactbench.contracts import FetchProfile
 from smcb.integrations.sceneactbench.packages import (
+    export_dynamic_package,
     export_static_package,
+    validate_dynamic_package,
     validate_static_package,
 )
 from smcb.integrations.sceneactbench.samples import (
@@ -36,6 +38,9 @@ from smcb.integrations.sceneactbench.scorer import (
     score_dynamic_prediction,
 )
 from smcb.storage.dataset import build_dataset, reproduce_sample, validate_dataset
+from smcb.worldtime.demo import build_worldtime_demo
+from smcb.worldtime.evaluation import evaluate_timeline
+from smcb.worldtime.schema import Timeline
 
 
 @dataclass(frozen=True)
@@ -194,6 +199,46 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_sceneact_common(sceneact_validate)
     sceneact_validate.add_argument("--scene-dir", type=Path, required=True)
+    sceneact_build_dynamic = sceneact_commands.add_parser(
+        "build-dynamic", help="render the two-mover canonical platform station"
+    )
+    _add_sceneact_common(sceneact_build_dynamic)
+    sceneact_build_dynamic.add_argument(
+        "--blueprint", type=Path, default=Path("configs/sceneact/platform_station_dynamic.yaml")
+    )
+    sceneact_build_dynamic.add_argument("--asset-index", type=Path)
+    sceneact_build_dynamic.add_argument("--output", type=Path, required=True)
+    sceneact_build_dynamic.add_argument("--ffmpeg-bin")
+    sceneact_build_dynamic.add_argument("--min-visible-pixel-ratio", type=float, default=0.0005)
+    sceneact_export_dynamic = sceneact_commands.add_parser(
+        "export-dynamic-package", help="export the canonical master for the Dynamic scorer"
+    )
+    _add_sceneact_common(sceneact_export_dynamic)
+    sceneact_export_dynamic.add_argument("--sample", type=Path, required=True)
+    sceneact_export_dynamic.add_argument("--output", type=Path, required=True)
+    sceneact_export_dynamic.add_argument("--min-visible-pixel-ratio", type=float, default=0.0005)
+    sceneact_validate_dynamic = sceneact_commands.add_parser(
+        "validate-dynamic-package", help="validate the exact two-mover Dynamic package"
+    )
+    _add_sceneact_common(sceneact_validate_dynamic)
+    sceneact_validate_dynamic.add_argument("--scene-dir", type=Path, required=True)
+
+    worldtime = commands.add_parser(
+        "worldtime", help="generate temporal edits and score Video Time -> World Time"
+    )
+    worldtime_commands = worldtime.add_subparsers(dest="worldtime_command", required=True)
+    worldtime_demo = worldtime_commands.add_parser(
+        "build-demo", help="build normal/reverse/freeze/replay videos and a showcase grid"
+    )
+    worldtime_demo.add_argument("--master-sample", type=Path, required=True)
+    worldtime_demo.add_argument("--output", type=Path, required=True)
+    worldtime_demo.add_argument("--ffmpeg-bin")
+    worldtime_score = worldtime_commands.add_parser(
+        "score", help="score one predicted timeline against ground truth"
+    )
+    worldtime_score.add_argument("--ground-truth", type=Path, required=True)
+    worldtime_score.add_argument("--prediction", type=Path, required=True)
+    worldtime_score.add_argument("--boundary-tolerance-frames", type=int, default=2)
 
     sample = commands.add_parser("sample-scene", help="write one deterministic Scene Program")
     sample.add_argument("--config", type=Path, default=Path("configs/dataset/scene_smoke.yaml"))
@@ -231,6 +276,7 @@ def build_parser() -> argparse.ArgumentParser:
     schema.add_argument(
         "--output", type=Path, default=Path("schemas/scene_program_v0.1.schema.json")
     )
+    schema.add_argument("--version", choices=("0.1", "0.2"), default="0.1")
     return parser
 
 
@@ -368,7 +414,60 @@ def _handle_sceneact(args: argparse.Namespace) -> int:
         package_inspection = validate_static_package(args.scene_dir)
         _print_json(package_inspection.model_dump(mode="json"))
         return 0 if package_inspection.passed else 1
+    if args.sceneact_command == "build-dynamic":
+        index_path = (
+            args.asset_index or project.asset_root / "normalized" / "index.json"
+        ).resolve()
+        dynamic_result = build_dynamic_scene(
+            blueprint_path=_manifest_path(project, args.blueprint),
+            asset_index_path=index_path,
+            output_dir=args.output,
+            project_root=project.root,
+            blender_bin=_blender_bin(replace(project, blender_bin=config.blender_bin), None),
+            blender_script=project.root / "blender_scripts" / "compile_scene.py",
+            ffmpeg_bin=args.ffmpeg_bin,
+            min_visible_pixel_ratio=args.min_visible_pixel_ratio,
+        )
+        _print_json(dynamic_result.model_dump(mode="json"))
+        return 0
+    if args.sceneact_command == "export-dynamic-package":
+        dynamic_package = export_dynamic_package(
+            sample_dir=args.sample,
+            output_dir=args.output,
+            min_visible_pixel_ratio=args.min_visible_pixel_ratio,
+        )
+        _print_json(dynamic_package.model_dump(mode="json"))
+        return 0
+    if args.sceneact_command == "validate-dynamic-package":
+        dynamic_inspection = validate_dynamic_package(args.scene_dir)
+        _print_json(dynamic_inspection.model_dump(mode="json"))
+        return 0 if dynamic_inspection.passed else 1
     raise AssertionError(f"unhandled SceneActBench command: {args.sceneact_command}")
+
+
+def _handle_worldtime(args: argparse.Namespace) -> int:
+    if args.worldtime_command == "build-demo":
+        ffmpeg_bin = args.ffmpeg_bin or shutil.which("ffmpeg")
+        if ffmpeg_bin is None:
+            raise FileNotFoundError("ffmpeg was not found")
+        result = build_worldtime_demo(
+            master_sample_dir=args.master_sample,
+            output_dir=args.output,
+            ffmpeg_bin=ffmpeg_bin,
+        )
+        _print_json(result.model_dump(mode="json"))
+        return 0
+    if args.worldtime_command == "score":
+        gt = Timeline.model_validate_json(args.ground_truth.read_text(encoding="utf-8"))
+        prediction = Timeline.model_validate_json(args.prediction.read_text(encoding="utf-8"))
+        score = evaluate_timeline(
+            gt,
+            prediction,
+            boundary_tolerance_frames=args.boundary_tolerance_frames,
+        )
+        _print_json(score.model_dump(mode="json"))
+        return 0
+    raise AssertionError(f"unhandled World-Time command: {args.worldtime_command}")
 
 
 def _handle_sample(args: argparse.Namespace, config: ProjectConfig) -> int:
@@ -439,6 +538,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _handle_doctor(args)
     if args.command == "sceneact":
         return _handle_sceneact(args)
+    if args.command == "worldtime":
+        return _handle_worldtime(args)
     config = _root_config()
     if args.command == "assets":
         return _handle_assets(args, config)
@@ -468,7 +569,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.command == "write-schema":
         output = args.output.resolve()
-        write_json_schema(output)
+        if args.version == "0.2":
+            write_json_schema_v02(output)
+        else:
+            write_json_schema(output)
         _print_json({"schema": output})
         return 0
     raise AssertionError(f"unhandled command: {args.command}")

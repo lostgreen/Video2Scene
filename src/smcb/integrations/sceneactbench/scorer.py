@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
 
 from smcb.integrations.sceneactbench.attribution import SCENEACT_PINNED_COMMIT
 from smcb.integrations.sceneactbench.doctor import sceneact_commit
+from smcb.integrations.sceneactbench.packages import validate_dynamic_package
 from smcb.integrations.sceneactbench.samples import inspect_dynamic_sample
 
 
@@ -37,15 +39,28 @@ def score_dynamic_prediction(
         raise RuntimeError(
             f"SceneActBench commit mismatch: expected {SCENEACT_PINNED_COMMIT}, found {commit}"
         )
-    inspection = inspect_dynamic_sample(sample_dir)
-    if not inspection.passed:
-        raise ValueError(f"invalid Dynamic sample: {', '.join(inspection.failures)}")
+    sample_dir = sample_dir.expanduser().resolve()
+    meta_path = sample_dir / "meta.json"
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    evaluation = meta.get("evaluation", {}) if isinstance(meta, dict) else {}
+    if isinstance(evaluation, dict) and evaluation.get("sceneact_dynamic_scorer_ready") is True:
+        local_inspection = validate_dynamic_package(sample_dir)
+        if not local_inspection.passed:
+            raise ValueError(
+                f"invalid local Dynamic package: {', '.join(local_inspection.failures)}"
+            )
+        scorer_sample_dir = str(local_inspection.scene_dir)
+    else:
+        inspection = inspect_dynamic_sample(sample_dir)
+        if not inspection.passed:
+            raise ValueError(f"invalid Dynamic sample: {', '.join(inspection.failures)}")
+        scorer_sample_dir = inspection.sample_dir
     prediction_glb = prediction_glb.expanduser().resolve()
     if not prediction_glb.is_file():
         raise FileNotFoundError(f"prediction GLB not found: {prediction_glb}")
     metrics_path = sceneact_root / "src" / "harness" / "metrics_t6.py"
     evaluate = _load_evaluate_t6(metrics_path)
-    result = evaluate(str(prediction_glb), inspection.sample_dir)
+    result = evaluate(str(prediction_glb), scorer_sample_dir)
     if not isinstance(result, dict):
         raise TypeError("SceneActBench evaluate_t6 returned a non-object result")
     return result
