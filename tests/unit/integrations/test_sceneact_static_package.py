@@ -36,12 +36,20 @@ SOURCE_NAMES = (
 )
 
 
-def _glb_bytes(*, root_names: tuple[str, ...] = ("asset",), animated: bool = False) -> bytes:
+def _glb_bytes(
+    *,
+    root_names: tuple[str, ...] = ("asset",),
+    animated: bool = False,
+    mesh_root_names: tuple[str, ...] = (),
+) -> bytes:
     payload: dict[str, object] = {
         "asset": {"version": "2.0"},
         "scene": 0,
         "scenes": [{"nodes": list(range(len(root_names)))}],
-        "nodes": [{"name": name} for name in root_names],
+        "nodes": [
+            {"name": name, **({"mesh": 0} if name in mesh_root_names else {})}
+            for name in root_names
+        ],
     }
     if animated:
         payload["animations"] = [{"name": "unexpected_static_animation"}]
@@ -239,3 +247,19 @@ def test_validate_static_package_rejects_assembled_animations(tmp_path: Path) ->
 
     assert not inspection.passed
     assert "invalid:static_animations:1" in inspection.failures
+
+
+def test_validate_static_package_rejects_untracked_mesh_root(tmp_path: Path) -> None:
+    sample = _write_rendered_sample(tmp_path)
+    output = tmp_path / "t6l1_local_static_004"
+    export_static_package(sample_dir=sample, output_dir=output)
+    meta = json.loads((output / "meta.json").read_text(encoding="utf-8"))
+    root_names = tuple(item["object_id"] for item in meta["components_private"]) + ("Ground",)
+    (output / "gt" / "scene.glb").write_bytes(
+        _glb_bytes(root_names=root_names, mesh_root_names=("Ground",))
+    )
+
+    inspection = validate_static_package(output)
+
+    assert not inspection.passed
+    assert "invalid:extra_mesh_roots:Ground" in inspection.failures

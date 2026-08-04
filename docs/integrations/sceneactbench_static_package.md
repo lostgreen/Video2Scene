@@ -60,7 +60,8 @@ video2scene sceneact validate-package --scene-dir <package>
 ```
 
 The validator checks the exact 24 fps/144-frame gate, 6-10 component cardinality, anonymous and
-contiguous component names, no symlink payloads, GLB/PNG/MP4 signatures, empty static mover map,
-layout/component agreement, official camera fields, and all recorded component SHA-256 values.
-It does not claim Dynamic scorer readiness. Milestone 3 adds controlled animation, dense mover
-trajectories, and oracle/perturbation scoring to this same scene.
+contiguous component names, no symlink payloads, valid GLB/PNG/MP4 structure, zero assembled-GLB
+animation blocks, stable component roots with no extra mesh-bearing scene root, empty static mover
+map, layout/component agreement, official camera fields, and all recorded component SHA-256
+values. It does not claim Dynamic scorer readiness. Milestone 3 adds controlled animation, dense
+mover trajectories, and oracle/perturbation scoring to this same scene.

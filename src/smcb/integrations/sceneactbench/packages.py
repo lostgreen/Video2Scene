@@ -384,6 +384,27 @@ def validate_static_package(scene_dir: Path) -> SceneActPackageInspection:
             if missing_roots:
                 failures.append(f"missing:stable_glb_roots:{','.join(missing_roots)}")
 
+            def subtree_has_mesh(node_index: int) -> bool:
+                node = nodes[node_index]
+                if "mesh" in node:
+                    return True
+                return any(
+                    subtree_has_mesh(child)
+                    for child in node.get("children", [])
+                    if isinstance(child, int) and 0 <= child < len(nodes)
+                )
+
+            extra_mesh_roots = sorted(
+                str(nodes[index].get("name", ""))
+                for index in root_indices
+                if isinstance(index, int)
+                and 0 <= index < len(nodes)
+                and str(nodes[index].get("name", "")) not in expected_root_names
+                and subtree_has_mesh(index)
+            )
+            if extra_mesh_roots:
+                failures.append(f"invalid:extra_mesh_roots:{','.join(extra_mesh_roots)}")
+
     return SceneActPackageInspection(
         scene_id=scene_id,
         scene_dir=scene_dir,
