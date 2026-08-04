@@ -126,9 +126,15 @@ class SceneProgram(StrictModel):
     schema_version: Literal["0.1"] = "0.1"
     sample_id: str
     seed: int
-    template: Literal["static_orbit", "moving_object", "moving_camera", "parent_motion"]
+    template: Literal[
+        "static_orbit",
+        "moving_object",
+        "moving_camera",
+        "parent_motion",
+        "platform_station_static",
+    ]
     coordinate_system: CoordinateSystem = Field(default_factory=CoordinateSystem)
-    objects: list[ObjectSpec] = Field(min_length=1, max_length=5)
+    objects: list[ObjectSpec] = Field(min_length=1, max_length=20)
     camera: CameraSpec
     lighting: LightingSpec
     animations: list[AnimationTrack] = Field(default_factory=list)

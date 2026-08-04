@@ -512,7 +512,7 @@
       "items": {
         "$ref": "#/$defs/ObjectSpec"
       },
-      "maxItems": 5,
+      "maxItems": 20,
       "minItems": 1,
       "title": "Objects",
       "type": "array"
@@ -539,7 +539,8 @@
         "static_orbit",
         "moving_object",
         "moving_camera",
-        "parent_motion"
+        "parent_motion",
+        "platform_station_static"
       ],
       "title": "Template",
       "type": "string"

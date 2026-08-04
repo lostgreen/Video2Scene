@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
+import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -192,6 +195,31 @@ def evaluated_bounds(
     )
 
 
+def evaluated_centroid(root: bpy.types.Object, depsgraph: bpy.types.Depsgraph) -> Vector | None:
+    """Match the upstream scorer's mean-of-mesh-centroids layout representation."""
+    centroids: list[Vector] = []
+    for obj in descendants(root):
+        if obj.type != "MESH":
+            continue
+        evaluated = obj.evaluated_get(depsgraph)
+        mesh = evaluated.to_mesh()
+        try:
+            if not mesh.vertices:
+                continue
+            total = Vector((0.0, 0.0, 0.0))
+            for vertex in mesh.vertices:
+                total += evaluated.matrix_world @ vertex.co
+            centroids.append(total / len(mesh.vertices))
+        finally:
+            evaluated.to_mesh_clear()
+    if not centroids:
+        return None
+    total = Vector((0.0, 0.0, 0.0))
+    for centroid in centroids:
+        total += centroid
+    return total / len(centroids)
+
+
 def bbox_corners(minimum: Vector, maximum: Vector) -> list[Vector]:
     return [
         Vector((x, y, z))
@@ -206,10 +234,13 @@ def extract_ground_truth(
     roots: dict[str, bpy.types.Object],
     camera: bpy.types.Object,
     output: Path,
+    sample_id: str,
 ) -> None:
     trajectories: dict[str, list[dict[str, Any]]] = {name: [] for name in roots}
     camera_frames: list[dict[str, Any]] = []
     visibility_frames: dict[str, list[dict[str, Any]]] = {name: [] for name in roots}
+    layout_objects: list[dict[str, Any]] = []
+    sceneact_camera: dict[str, Any] = {}
     width = scene.render.resolution_x
     height = scene.render.resolution_y
     for frame in range(scene.frame_start, scene.frame_end + 1):
@@ -227,6 +258,17 @@ def extract_ground_truth(
                 "type": camera.data.type,
             }
         )
+        if frame == scene.frame_start:
+            euler = matrix.to_euler("XYZ")
+            sceneact_camera = {
+                "name": camera.name,
+                "type": camera.data.type,
+                "location": list(matrix.translation),
+                "rotation_euler_deg": [math.degrees(value) for value in euler],
+                "lens_mm": camera.data.lens,
+                "matrix_world": [list(row) for row in matrix],
+                "note": "Video2Scene fixed platform-station camera",
+            }
         for object_id, root in roots.items():
             evaluated = root.evaluated_get(depsgraph)
             object_matrix = evaluated.matrix_world
@@ -239,6 +281,10 @@ def extract_ground_truth(
                     "scale": list(object_matrix.to_scale()),
                 }
             )
+            if frame == scene.frame_start:
+                centroid = evaluated_centroid(root, depsgraph)
+                if centroid is not None:
+                    layout_objects.append({"name": object_id, "location": list(centroid)})
             bounds = evaluated_bounds(root, depsgraph)
             if bounds is None:
                 visibility_frames[object_id].append(
@@ -293,6 +339,35 @@ def extract_ground_truth(
     (gt_dir / "visibility.json").write_text(
         json.dumps(visibility, indent=2) + "\n", encoding="utf-8"
     )
+    (gt_dir / "layout.json").write_text(
+        json.dumps({"sample_id": sample_id, "objects": layout_objects}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (gt_dir / "camera_sceneact.json").write_text(
+        json.dumps(sceneact_camera, indent=2) + "\n", encoding="utf-8"
+    )
+
+
+def render_frames(scene: bpy.types.Scene, scene_program: dict[str, Any], output: Path) -> None:
+    """Render static programs once while preserving the dense frame contract."""
+    if scene_program["animations"]:
+        bpy.ops.render.render(animation=True)
+        return
+    first_frame_number = scene.frame_start
+    first_frame = output / "frames" / f"frame_{first_frame_number:04d}.png"
+    animation_path = scene.render.filepath
+    scene.frame_set(first_frame_number)
+    scene.render.filepath = str(first_frame)
+    bpy.ops.render.render(write_still=True)
+    if not first_frame.is_file():
+        raise RuntimeError(f"static render did not produce {first_frame}")
+    for frame in range(first_frame_number + 1, scene.frame_end + 1):
+        destination = output / "frames" / f"frame_{frame:04d}.png"
+        try:
+            os.link(first_frame, destination)
+        except OSError:
+            shutil.copyfile(first_frame, destination)
+    scene.render.filepath = animation_path
 
 
 def main() -> None:
@@ -305,21 +380,26 @@ def main() -> None:
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
     configure_world(scene, scene_program["lighting"])
-    add_ground()
+    ground = add_ground()
     roots = import_instances(scene_program, asset_index)
     camera, _target = create_camera(scene_program)
     targets = {**roots, scene_program["camera"]["id"]: camera}
     apply_animations(scene_program, targets)
     configure_render(scene, scene_program["render"], args.output)
-    extract_ground_truth(scene, roots, camera, args.output)
+    extract_ground_truth(
+        scene, roots, camera, args.output, sample_id=str(scene_program["sample_id"])
+    )
     bpy.ops.wm.save_as_mainfile(filepath=str(args.output / "scene.blend"))
+    ground.hide_set(True)
     bpy.ops.export_scene.gltf(
         filepath=str(args.output / "scene.glb"),
         export_format="GLB",
         export_animations=True,
         export_force_sampling=True,
+        use_visible=True,
     )
-    bpy.ops.render.render(animation=True)
+    ground.hide_set(False)
+    render_frames(scene, scene_program, args.output)
     print(json.dumps({"sample_id": scene_program["sample_id"], "status": "ok"}))
 
 

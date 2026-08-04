@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -36,3 +37,59 @@ class DynamicFetchResult(BaseModel):
     dataset_revision: str
     downloaded_file_count: int = Field(ge=0)
     downloaded_bytes: int = Field(ge=0)
+
+
+class StaticRenderInspection(BaseModel):
+    """Visibility gate for one locally rendered static Scene Program."""
+
+    sample_id: str
+    sample_dir: Path
+    object_count: int = Field(ge=0)
+    visible_object_count: int = Field(ge=0)
+    min_visible_pixel_ratio: float = Field(ge=0)
+    object_pixel_ratios: dict[str, float]
+    failures: list[str]
+    passed: bool
+
+
+class StaticSceneBuildResult(BaseModel):
+    """Artifacts emitted before SceneAct package conversion."""
+
+    sample_id: str
+    sample_dir: Path
+    scene_program: Path
+    reference_video: Path
+    preview: Path
+    inspection: StaticRenderInspection
+
+
+class SceneActDynamicPackage(BaseModel):
+    """Filesystem contract shared by static M2 and later dynamic scenes."""
+
+    scene_id: str
+    fps: int = Field(gt=0)
+    frame_count: int = Field(gt=0)
+    components_dir: Path
+    reference_dir: Path
+    reference_video: Path
+    gt_scene_glb: Path
+    trajectory_json: Path
+    layout_gt_json: Path
+    camera_json: Path
+    meta_json: Path
+    preview_png: Path
+
+
+class SceneActPackageInspection(BaseModel):
+    """Strict, non-Blender validation result for one local SceneAct package."""
+
+    scene_id: str
+    scene_dir: Path
+    fps: int = Field(ge=0)
+    frame_count: int = Field(ge=0)
+    component_count: int = Field(ge=0)
+    reference_frame_count: int = Field(ge=0)
+    layout_object_count: int = Field(ge=0)
+    mover_count: int = Field(ge=0)
+    failures: list[str]
+    passed: bool

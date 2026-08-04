@@ -89,3 +89,23 @@ def test_unknown_parent_is_rejected() -> None:
     ]
     with pytest.raises(ValidationError, match="unknown parent_id"):
         SceneProgram.model_validate(payload)
+
+
+def test_v01_accepts_twenty_objects_without_changing_existing_templates() -> None:
+    config = load_dataset_config(ROOT / "configs" / "dataset" / "scene_smoke.yaml")
+    scene = sample_scene(
+        config=config,
+        asset_index=asset_index(),
+        seed=3,
+        sample_id="sample_000001",
+        template="moving_object",
+    )
+    objects = [
+        scene.objects[0].model_copy(update={"id": f"object_{index:03d}"}) for index in range(20)
+    ]
+
+    expanded = scene.model_copy(update={"objects": objects})
+
+    assert expanded.schema_version == "0.1"
+    assert expanded.template == "moving_object"
+    assert len(SceneProgram.model_validate(expanded.model_dump(mode="json")).objects) == 20

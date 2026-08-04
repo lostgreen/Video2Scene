@@ -21,7 +21,12 @@ from smcb.dsl.io import load_scene, write_json_schema, write_scene
 from smcb.generation.config import load_dataset_config
 from smcb.generation.sampler import load_asset_index, sample_scene
 from smcb.integrations.sceneactbench import SceneActConfig, collect_sceneact_doctor
+from smcb.integrations.sceneactbench.builder import build_static_scene
 from smcb.integrations.sceneactbench.contracts import FetchProfile
+from smcb.integrations.sceneactbench.packages import (
+    export_static_package,
+    validate_static_package,
+)
 from smcb.integrations.sceneactbench.samples import (
     fetch_dynamic_sample,
     inspect_dynamic_sample,
@@ -166,6 +171,29 @@ def build_parser() -> argparse.ArgumentParser:
     _add_sceneact_common(sceneact_score)
     sceneact_score.add_argument("--scene-dir", type=Path, required=True)
     sceneact_score.add_argument("--prediction", type=Path, required=True)
+    sceneact_build_static = sceneact_commands.add_parser(
+        "build-static", help="render the deterministic multi-asset platform station"
+    )
+    _add_sceneact_common(sceneact_build_static)
+    sceneact_build_static.add_argument(
+        "--blueprint", type=Path, default=Path("configs/sceneact/platform_station_static.yaml")
+    )
+    sceneact_build_static.add_argument("--asset-index", type=Path)
+    sceneact_build_static.add_argument("--output", type=Path, required=True)
+    sceneact_build_static.add_argument("--ffmpeg-bin")
+    sceneact_build_static.add_argument("--min-visible-pixel-ratio", type=float, default=0.0005)
+    sceneact_export = sceneact_commands.add_parser(
+        "export-package", help="export a rendered sample as a static SceneAct package"
+    )
+    _add_sceneact_common(sceneact_export)
+    sceneact_export.add_argument("--sample", type=Path, required=True)
+    sceneact_export.add_argument("--output", type=Path, required=True)
+    sceneact_export.add_argument("--min-visible-pixel-ratio", type=float, default=0.0005)
+    sceneact_validate = sceneact_commands.add_parser(
+        "validate-package", help="validate a local static SceneAct package"
+    )
+    _add_sceneact_common(sceneact_validate)
+    sceneact_validate.add_argument("--scene-dir", type=Path, required=True)
 
     sample = commands.add_parser("sample-scene", help="write one deterministic Scene Program")
     sample.add_argument("--config", type=Path, default=Path("configs/dataset/scene_smoke.yaml"))
@@ -289,17 +317,17 @@ def _handle_sceneact(args: argparse.Namespace) -> int:
         _print_json(asdict(report))
         return 0 if report.passed else 1
     if args.sceneact_command == "fetch-sample":
-        result = fetch_dynamic_sample(
+        fetch_result = fetch_dynamic_sample(
             scene_id=args.scene_id,
             output_root=(args.output or config.data_root),
             profile=cast(FetchProfile, args.profile),
         )
-        _print_json(result.model_dump(mode="json"))
+        _print_json(fetch_result.model_dump(mode="json"))
         return 0
     if args.sceneact_command == "inspect-sample":
-        inspection = inspect_dynamic_sample(args.scene_dir)
-        _print_json(inspection.model_dump(mode="json"))
-        return 0 if inspection.passed else 1
+        sample_inspection = inspect_dynamic_sample(args.scene_dir)
+        _print_json(sample_inspection.model_dump(mode="json"))
+        return 0 if sample_inspection.passed else 1
     if args.sceneact_command == "score-oracle":
         _print_json(score_dynamic_oracle(sceneact_root=config.root, sample_dir=args.scene_dir))
         return 0
@@ -312,6 +340,34 @@ def _handle_sceneact(args: argparse.Namespace) -> int:
             )
         )
         return 0
+    if args.sceneact_command == "build-static":
+        index_path = (
+            args.asset_index or project.asset_root / "normalized" / "index.json"
+        ).resolve()
+        build_result = build_static_scene(
+            blueprint_path=_manifest_path(project, args.blueprint),
+            asset_index_path=index_path,
+            output_dir=args.output,
+            project_root=project.root,
+            blender_bin=_blender_bin(replace(project, blender_bin=config.blender_bin), None),
+            blender_script=project.root / "blender_scripts" / "compile_scene.py",
+            ffmpeg_bin=args.ffmpeg_bin,
+            min_visible_pixel_ratio=args.min_visible_pixel_ratio,
+        )
+        _print_json(build_result.model_dump(mode="json"))
+        return 0
+    if args.sceneact_command == "export-package":
+        package = export_static_package(
+            sample_dir=args.sample,
+            output_dir=args.output,
+            min_visible_pixel_ratio=args.min_visible_pixel_ratio,
+        )
+        _print_json(package.model_dump(mode="json"))
+        return 0
+    if args.sceneact_command == "validate-package":
+        package_inspection = validate_static_package(args.scene_dir)
+        _print_json(package_inspection.model_dump(mode="json"))
+        return 0 if package_inspection.passed else 1
     raise AssertionError(f"unhandled SceneActBench command: {args.sceneact_command}")
 
 
