@@ -87,6 +87,13 @@ def import_instances(
         before = set(bpy.data.objects)
         bpy.ops.import_scene.gltf(filepath=glb_path)
         imported = [obj for obj in bpy.data.objects if obj not in before]
+        # Asset-authored clips are outside Scene Program and must not leak into the scene GLB.
+        for obj in imported:
+            if obj.animation_data is not None:
+                obj.animation_data_clear()
+            data = obj.data
+            if data is not None and hasattr(data, "animation_data_clear"):
+                data.animation_data_clear()
         root = bpy.data.objects.new(spec["id"], None)
         bpy.context.scene.collection.objects.link(root)
         for obj in imported:

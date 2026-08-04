@@ -14,6 +14,9 @@ normal/reverse/freeze/replay observations, timeline GT, automatic mapping scores
   unmodified pinned SceneAct scorer runs.
 - The World-Time evaluator covers mapping error, breakpoints, direction, and playback rate.
 - Current local check: Ruff passes and 36 focused tests pass.
+- KML check at `af2c524`: Ruff, mypy, full 51-test suite, and CLI help pass.
+- The first canonical render passed its gate with 144 frames, 11/11 visible targets, and mover
+  travel of approximately 2.63 m and 10.50 m.
 - Local full CLI/mypy are not authoritative because the Mac environment lacks the repository's
   optional `gdown`, `pydantic`, and type-stub dependencies. No Mac installation is permitted.
 
@@ -24,20 +27,21 @@ normal/reverse/freeze/replay observations, timeline GT, automatic mapping scores
 - `src/smcb/integrations/sceneactbench/` and `blender_scripts/compile_scene.py`
 - `src/smcb/worldtime/`, CLI commands, unit tests, and integration documentation
 
-## Current hypothesis
+## Latest failure fingerprint
 
-The selected-only Blender GLB export will preserve the 11 stable component roots and animation
-channels only beneath `mover_vehicle` and `mover_platform`. The canonical centroids should match
-the pinned scorer because both implementations average per-mesh vertex centroids over a mover
-subtree.
+The first Dynamic package export was rejected with
+`animated_root_mismatch:cargo_chest,mover_platform,mover_vehicle:mover_platform,mover_vehicle`.
+The normalized Chest GLB contains two asset-authored clips targeting three nodes. Those inherited
+actions entered the assembled GLB when animation export was enabled. The current fix clears
+imported object/data animation before Scene Program tracks are applied; the canonical centroids
+and rendered appearance should remain unchanged.
 
 ## Next actions
 
-1. On KML, verify Blender 4.5 accepts the selected-only glTF export options.
-2. Render the 144-frame dynamic master under `/m2v_intern/xuboshen/zgw/Video2Scene/data/` and
-   inspect visibility, mover travel, GLB roots, and a representative frame.
-3. Export/validate the local Dynamic package and run its oracle through pinned `metrics_t6.py`.
-4. Generate the four observations and showcase, inspect compact metrics and ffprobe metadata, and
+1. Re-render with imported asset animation stripped and verify the only animated GLB roots are the
+   two declared movers.
+2. Export/validate the local Dynamic package and run its oracle through pinned `metrics_t6.py`.
+3. Generate the four observations and showcase, inspect compact metrics and ffprobe metadata, and
    download the final MP4 for review.
 
 Verbose Blender and ffmpeg output must remain in remote log files under
