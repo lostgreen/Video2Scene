@@ -22,7 +22,7 @@ part of this task.
 `worldtime build-eval-task` creates physically separate directories:
 
 ```text
-blind_replay_001/
+core_case_001/
   public/
     PROMPT.md
     task.json
@@ -50,8 +50,8 @@ Build a task from the existing replay observation:
 video2scene worldtime build-eval-task \
   --canonical-sample "$SMCB_DATA_DIR/sceneact_sources/platform_station_dynamic_001" \
   --observation "$SMCB_DATA_DIR/worldtime_demo/platform_station_dynamic_001/observations/replay" \
-  --task-id blind_replay_001 \
-  --output "$SMCB_DATA_DIR/model_evaluation_demo/blind_replay_001"
+  --task-id core_case_001 \
+  --output "$SMCB_DATA_DIR/model_evaluation_demo/core_case_001"
 ```
 
 ## Submission contract

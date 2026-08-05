@@ -239,7 +239,10 @@ def build_model_evaluation_task(
                 "Video editing is piecewise linear and may include forward, reverse, "
                 "freeze, or replay."
             ),
-            "The observation preserves frame count but may omit a canonical suffix after replay.",
+            (
+                "The observation preserves frame count, while temporal edits may omit parts "
+                "of the canonical world."
+            ),
         ],
     )
     (public_dir / "task.json").write_text(task.model_dump_json(indent=2) + "\n", encoding="utf-8")

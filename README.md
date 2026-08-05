@@ -115,10 +115,10 @@ generate a baseline/oracle-bracketed evaluation report:
 video2scene worldtime build-eval-task \
   --canonical-sample "$SMCB_DATA_DIR/sceneact_sources/platform_station_dynamic_001" \
   --observation "$SMCB_DATA_DIR/worldtime_demo/platform_station_dynamic_001/observations/replay" \
-  --task-id blind_replay_001 \
-  --output "$SMCB_DATA_DIR/model_evaluation_demo/blind_replay_001"
+  --task-id core_case_001 \
+  --output "$SMCB_DATA_DIR/model_evaluation_demo/core_case_001"
 video2scene worldtime inspect-submission \
-  --task "$SMCB_DATA_DIR/model_evaluation_demo/blind_replay_001" \
+  --task "$SMCB_DATA_DIR/model_evaluation_demo/core_case_001" \
   --submission "$SUBMISSION_DIR"
 ```
 

@@ -9,7 +9,7 @@ World-Time scoring, pinned SceneAct scoring, baseline/oracle comparison, and vis
 ## Current evidence
 
 - The task packager separates anonymous public input from timeline, scene, edit, ID-map, and source
-  GT under `private/`.
+  GT under `private/`; task IDs and public assumptions are neutral with respect to the hidden edit.
 - The submission gate allows animation-only edits and rejects changes to known scene fields.
 - Reports compare identity/subagent/oracle timelines and no-motion/subagent/oracle 3D motion.
 - The focused local World-Time suite passes 17 tests; Ruff and mypy pass for changed modules.

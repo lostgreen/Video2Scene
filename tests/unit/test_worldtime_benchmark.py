@@ -112,7 +112,7 @@ def _build_task(tmp_path: Path, monkeypatch: object) -> Path:
         canonical_sample_dir=canonical,
         observation_dir=observation,
         output_dir=task_dir,
-        task_id="blind_replay_001",
+        task_id="core_case_001",
         ffmpeg_bin="ffmpeg-test",
     )
     return task_dir
