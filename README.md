@@ -108,6 +108,24 @@ The final directory contains four six-second observations, piecewise-linear time
 and identity-baseline scores, and `showcase.mp4`. See the
 [World-Time demo contract](docs/integrations/worldtime_demo.md).
 
+Package one observation as a blind model task, validate an untouched structured response, and
+generate a baseline/oracle-bracketed evaluation report:
+
+```bash
+video2scene worldtime build-eval-task \
+  --canonical-sample "$SMCB_DATA_DIR/sceneact_sources/platform_station_dynamic_001" \
+  --observation "$SMCB_DATA_DIR/worldtime_demo/platform_station_dynamic_001/observations/replay" \
+  --task-id blind_replay_001 \
+  --output "$SMCB_DATA_DIR/model_evaluation_demo/blind_replay_001"
+video2scene worldtime inspect-submission \
+  --task "$SMCB_DATA_DIR/model_evaluation_demo/blind_replay_001" \
+  --submission "$SUBMISSION_DIR"
+```
+
+The public task and private GT are physically separated. The final report diagnoses timeline
+recovery, edit boundaries, playback direction/rate, mover discovery, and 3D trajectory quality.
+See the [blind model evaluation protocol](docs/integrations/model_evaluation_demo.md).
+
 ## External data
 
 Raw assets, normalized assets, previews, frames, and generated datasets are never tracked by

@@ -38,6 +38,11 @@ from smcb.integrations.sceneactbench.scorer import (
     score_dynamic_prediction,
 )
 from smcb.storage.dataset import build_dataset, reproduce_sample, validate_dataset
+from smcb.worldtime.benchmark import (
+    build_model_evaluation_task,
+    evaluate_model_submission,
+    inspect_model_submission,
+)
 from smcb.worldtime.demo import build_worldtime_demo
 from smcb.worldtime.evaluation import evaluate_timeline
 from smcb.worldtime.schema import Timeline
@@ -239,6 +244,30 @@ def build_parser() -> argparse.ArgumentParser:
     worldtime_score.add_argument("--ground-truth", type=Path, required=True)
     worldtime_score.add_argument("--prediction", type=Path, required=True)
     worldtime_score.add_argument("--boundary-tolerance-frames", type=int, default=2)
+    worldtime_build_task = worldtime_commands.add_parser(
+        "build-eval-task", help="package one blind model task with physically separated GT"
+    )
+    worldtime_build_task.add_argument("--canonical-sample", type=Path, required=True)
+    worldtime_build_task.add_argument("--observation", type=Path, required=True)
+    worldtime_build_task.add_argument("--output", type=Path, required=True)
+    worldtime_build_task.add_argument("--task-id", required=True)
+    worldtime_build_task.add_argument("--ffmpeg-bin")
+    worldtime_inspect = worldtime_commands.add_parser(
+        "inspect-submission", help="validate one blind structured model submission"
+    )
+    worldtime_inspect.add_argument("--task", type=Path, required=True)
+    worldtime_inspect.add_argument("--submission", type=Path, required=True)
+    worldtime_evaluate = worldtime_commands.add_parser(
+        "evaluate-submission", help="score and report one blind model submission"
+    )
+    worldtime_evaluate.add_argument("--task", type=Path, required=True)
+    worldtime_evaluate.add_argument("--submission", type=Path, required=True)
+    worldtime_evaluate.add_argument("--output", type=Path, required=True)
+    worldtime_evaluate.add_argument("--sceneact-score", type=Path)
+    worldtime_evaluate.add_argument("--sceneact-baseline", type=Path)
+    worldtime_evaluate.add_argument("--sceneact-oracle", type=Path)
+    worldtime_evaluate.add_argument("--prediction-video", type=Path)
+    worldtime_evaluate.add_argument("--reference-video", type=Path)
 
     sample = commands.add_parser("sample-scene", help="write one deterministic Scene Program")
     sample.add_argument("--config", type=Path, default=Path("configs/dataset/scene_smoke.yaml"))
@@ -466,6 +495,39 @@ def _handle_worldtime(args: argparse.Namespace) -> int:
             boundary_tolerance_frames=args.boundary_tolerance_frames,
         )
         _print_json(score.model_dump(mode="json"))
+        return 0
+    if args.worldtime_command == "build-eval-task":
+        ffmpeg_bin = args.ffmpeg_bin or shutil.which("ffmpeg")
+        if ffmpeg_bin is None:
+            raise FileNotFoundError("ffmpeg was not found")
+        task_result = build_model_evaluation_task(
+            canonical_sample_dir=args.canonical_sample,
+            observation_dir=args.observation,
+            output_dir=args.output,
+            task_id=args.task_id,
+            ffmpeg_bin=ffmpeg_bin,
+        )
+        _print_json(task_result.model_dump(mode="json"))
+        return 0
+    if args.worldtime_command == "inspect-submission":
+        inspection = inspect_model_submission(
+            task_dir=args.task,
+            submission_dir=args.submission,
+        )
+        _print_json(inspection.model_dump(mode="json"))
+        return 0 if inspection.passed else 1
+    if args.worldtime_command == "evaluate-submission":
+        evaluation_result = evaluate_model_submission(
+            task_dir=args.task,
+            submission_dir=args.submission,
+            output_dir=args.output,
+            sceneact_score_path=args.sceneact_score,
+            sceneact_baseline_path=args.sceneact_baseline,
+            sceneact_oracle_path=args.sceneact_oracle,
+            prediction_video_path=args.prediction_video,
+            reference_video_path=args.reference_video,
+        )
+        _print_json(evaluation_result.model_dump(mode="json"))
         return 0
     raise AssertionError(f"unhandled World-Time command: {args.worldtime_command}")
 
