@@ -419,8 +419,12 @@ def _invalid_timeline_audit(*, path: Path, gt: Timeline) -> dict[str, Any]:
 
     declared_starts = [int(item["video_start_frame"]) for item in segments]
     declared_ends = [int(item["video_end_frame"]) for item in segments]
+    declared_world_starts = [item.get("world_start_time") for item in segments]
+    declared_world_ends = [item.get("world_end_time") for item in segments]
     expected_starts = [item.video_start_frame for item in gt.segments]
     expected_ends = [item.video_end_frame for item in gt.segments]
+    expected_world_starts = [item.world_start_time for item in gt.segments]
+    expected_world_ends = [item.world_end_time for item in gt.segments]
     coverage_issues: list[dict[str, int]] = []
     expected_start = 0
     for index, (start, end) in enumerate(zip(declared_starts, declared_ends, strict=True)):
@@ -463,8 +467,12 @@ def _invalid_timeline_audit(*, path: Path, gt: Timeline) -> dict[str, Any]:
         "declared_segment_count": len(segments),
         "declared_start_boundaries": declared_starts,
         "declared_end_boundaries": declared_ends,
+        "declared_world_start_times": declared_world_starts,
+        "declared_world_end_times": declared_world_ends,
         "expected_start_boundaries": expected_starts,
         "expected_end_boundaries": expected_ends,
+        "expected_world_start_times": expected_world_starts,
+        "expected_world_end_times": expected_world_ends,
         "internal_boundary_metrics": _boundary_metrics(
             declared=declared_starts[1:],
             expected=expected_starts[1:],
@@ -866,6 +874,10 @@ def evaluate_model_submission(
         audit_boundaries = invalid_timeline_audit["internal_boundary_metrics"]
         declared_starts = invalid_timeline_audit["declared_start_boundaries"]
         expected_starts = invalid_timeline_audit["expected_start_boundaries"]
+        declared_world_starts = invalid_timeline_audit["declared_world_start_times"]
+        expected_world_starts = invalid_timeline_audit["expected_world_start_times"]
+        declared_world_ends = invalid_timeline_audit["declared_world_end_times"]
+        expected_world_ends = invalid_timeline_audit["expected_world_end_times"]
         coverage_issues = invalid_timeline_audit["inclusive_coverage_issues"]
         audit_metadata = invalid_timeline_audit["metadata"]
         declared_duration = _metric(audit_metadata["declared_world_duration"])
@@ -875,6 +887,8 @@ def evaluate_model_submission(
 | Evidence | Submitted | Expected / Result |
 | --- | --- | --- |
 | Start boundaries | `{declared_starts}` | `{expected_starts}` |
+| World start times | `{declared_world_starts}` | `{expected_world_starts}` |
+| World end times | `{declared_world_ends}` | `{expected_world_ends}` |
 | Boundary F1 | `{_metric(audit_boundaries["f1"])}` | diagnostic only |
 | Inclusive coverage issues | `{coverage_issues}` | `[]` |
 | World duration | `{declared_duration}` | `{expected_duration}` |
@@ -885,6 +899,14 @@ This audit does not repair the raw submission or assign a World-Time score.
             '<section class="audit"><h3>Non-scoring Invalid Timeline Audit</h3>'
             f"<p><strong>Submitted starts:</strong> {html.escape(str(declared_starts))}<br>"
             f"<strong>Expected starts:</strong> {html.escape(str(expected_starts))}<br>"
+            f"<strong>Submitted world starts:</strong> "
+            f"{html.escape(str(declared_world_starts))}<br>"
+            f"<strong>Expected world starts:</strong> "
+            f"{html.escape(str(expected_world_starts))}<br>"
+            f"<strong>Submitted world ends:</strong> "
+            f"{html.escape(str(declared_world_ends))}<br>"
+            f"<strong>Expected world ends:</strong> "
+            f"{html.escape(str(expected_world_ends))}<br>"
             f"<strong>Boundary F1:</strong> {_metric(audit_boundaries['f1'])}<br>"
             f"<strong>Coverage issues:</strong> {html.escape(str(coverage_issues))}<br>"
             "The raw timeline remains invalid and receives no World-Time score.</p></section>"
