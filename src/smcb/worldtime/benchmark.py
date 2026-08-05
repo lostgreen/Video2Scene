@@ -376,6 +376,108 @@ def _load_optional_score(path: Path | None) -> dict[str, Any] | None:
     return _json_object(path.expanduser().resolve())
 
 
+def _boundary_metrics(
+    *,
+    declared: list[int],
+    expected: list[int],
+    tolerance: int = 2,
+) -> dict[str, float]:
+    unmatched = set(expected)
+    matches = 0
+    for boundary in declared:
+        candidates = [item for item in unmatched if abs(item - boundary) <= tolerance]
+        if candidates:
+            matched = min(candidates, key=lambda item: abs(item - boundary))
+            unmatched.remove(matched)
+            matches += 1
+    precision = matches / len(declared) if declared else (1.0 if not expected else 0.0)
+    recall = matches / len(expected) if expected else (1.0 if not declared else 0.0)
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    return {"precision": precision, "recall": recall, "f1": f1}
+
+
+def _invalid_timeline_audit(*, path: Path, gt: Timeline) -> dict[str, Any]:
+    """Extract non-scoring evidence from a parseable but contract-invalid timeline."""
+    try:
+        payload = _json_object(path)
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        return {"available": False, "reason": type(error).__name__}
+    raw_segments = payload.get("segments")
+    if not isinstance(raw_segments, list) or not raw_segments:
+        return {"available": False, "reason": "segments_not_a_nonempty_list"}
+    segments: list[dict[str, Any]] = []
+    for item in raw_segments:
+        if not isinstance(item, dict):
+            return {"available": False, "reason": "segment_not_an_object"}
+        start = item.get("video_start_frame")
+        end = item.get("video_end_frame")
+        if not isinstance(start, int) or isinstance(start, bool):
+            return {"available": False, "reason": "segment_start_not_an_integer"}
+        if not isinstance(end, int) or isinstance(end, bool):
+            return {"available": False, "reason": "segment_end_not_an_integer"}
+        segments.append(item)
+
+    declared_starts = [int(item["video_start_frame"]) for item in segments]
+    declared_ends = [int(item["video_end_frame"]) for item in segments]
+    expected_starts = [item.video_start_frame for item in gt.segments]
+    expected_ends = [item.video_end_frame for item in gt.segments]
+    coverage_issues: list[dict[str, int]] = []
+    expected_start = 0
+    for index, (start, end) in enumerate(zip(declared_starts, declared_ends, strict=True)):
+        if start != expected_start:
+            coverage_issues.append(
+                {
+                    "segment_index": index,
+                    "expected_start": expected_start,
+                    "declared_start": start,
+                }
+            )
+        expected_start = end + 1
+    if expected_start != gt.video_frame_count:
+        coverage_issues.append(
+            {
+                "segment_index": len(segments),
+                "expected_start": gt.video_frame_count,
+                "declared_start": expected_start,
+            }
+        )
+
+    metadata = {
+        "fps_matches": payload.get("fps") == gt.fps,
+        "video_frame_count_matches": (payload.get("video_frame_count") == gt.video_frame_count),
+        "world_duration_matches": (
+            isinstance(payload.get("world_duration"), int | float)
+            and not isinstance(payload.get("world_duration"), bool)
+            and math.isclose(
+                float(payload["world_duration"]),
+                gt.world_duration,
+                abs_tol=1e-8,
+            )
+        ),
+        "declared_world_duration": payload.get("world_duration"),
+        "expected_world_duration": gt.world_duration,
+    }
+    return {
+        "available": True,
+        "strict_score_eligible": False,
+        "declared_segment_count": len(segments),
+        "declared_start_boundaries": declared_starts,
+        "declared_end_boundaries": declared_ends,
+        "expected_start_boundaries": expected_starts,
+        "expected_end_boundaries": expected_ends,
+        "internal_boundary_metrics": _boundary_metrics(
+            declared=declared_starts[1:],
+            expected=expected_starts[1:],
+        ),
+        "inclusive_coverage_issues": coverage_issues,
+        "metadata": metadata,
+        "note": (
+            "Diagnostic only: raw declarations are compared after submission, but the invalid "
+            "timeline is neither repaired nor assigned a World-Time score."
+        ),
+    }
+
+
 def _timeline_svg(*, gt: Timeline, prediction: Timeline, identity: Timeline) -> str:
     width, height = 920, 500
     left, top, plot_width, plot_height = 72, 36, 810, 390
@@ -618,11 +720,17 @@ def evaluate_model_submission(
     )
     prediction: Timeline | None = None
     model_score: WorldTimeScore | None = None
+    invalid_timeline_audit: dict[str, Any] | None = None
     if inspection.timeline_valid:
         prediction = Timeline.model_validate_json(
             (submission_dir / task.output.timeline).read_text(encoding="utf-8")
         )
         model_score = evaluate_timeline(gt, prediction)
+    else:
+        invalid_timeline_audit = _invalid_timeline_audit(
+            path=submission_dir / task.output.timeline,
+            gt=gt,
+        )
     identity_score = evaluate_timeline(gt, identity)
     oracle_score = evaluate_timeline(gt, gt)
     sceneact_score = _load_optional_score(sceneact_score_path)
@@ -658,11 +766,21 @@ def evaluate_model_submission(
     mapping_delta = (
         identity_score.normalized_mae - model_score.normalized_mae if model_score else None
     )
-    temporal_diagnosis = (
-        "The structured prediction beats the identity baseline on source-time mapping."
-        if mapping_delta is not None and mapping_delta > 0
-        else "The structured prediction does not beat the identity mapping baseline."
-    )
+    if mapping_delta is not None and mapping_delta > 0:
+        temporal_diagnosis = (
+            "The structured prediction beats the identity baseline on source-time mapping."
+        )
+    elif invalid_timeline_audit and invalid_timeline_audit.get("available") is True:
+        boundary_metrics = invalid_timeline_audit["internal_boundary_metrics"]
+        temporal_diagnosis = (
+            "The timeline is ineligible for primary scoring. Its declared internal boundaries "
+            f"have diagnostic F1={_metric(boundary_metrics['f1'])}, while inclusive frame "
+            "coverage or sampling metadata violate the output contract."
+        )
+    else:
+        temporal_diagnosis = (
+            "The structured prediction does not beat the identity mapping baseline."
+        )
     scene_diagnosis = "Scene reconstruction was not scored."
     if sceneact_score is not None:
         recall = sceneact_score.get("movable_recall")
@@ -692,6 +810,7 @@ def evaluate_model_submission(
             "identity": identity_payload,
             "oracle": oracle_payload,
             "normalized_mae_improvement_over_identity": mapping_delta,
+            "invalid_submission_audit": invalid_timeline_audit,
         },
         "sceneact": {
             "subagent": sceneact_score,
@@ -741,6 +860,35 @@ def evaluate_model_submission(
             )
         )
     )
+    invalid_audit_markdown = ""
+    invalid_audit_html = ""
+    if invalid_timeline_audit and invalid_timeline_audit.get("available") is True:
+        audit_boundaries = invalid_timeline_audit["internal_boundary_metrics"]
+        declared_starts = invalid_timeline_audit["declared_start_boundaries"]
+        expected_starts = invalid_timeline_audit["expected_start_boundaries"]
+        coverage_issues = invalid_timeline_audit["inclusive_coverage_issues"]
+        audit_metadata = invalid_timeline_audit["metadata"]
+        declared_duration = _metric(audit_metadata["declared_world_duration"])
+        expected_duration = _metric(audit_metadata["expected_world_duration"])
+        invalid_audit_markdown = f"""### Non-scoring Invalid Timeline Audit
+
+| Evidence | Submitted | Expected / Result |
+| --- | --- | --- |
+| Start boundaries | `{declared_starts}` | `{expected_starts}` |
+| Boundary F1 | `{_metric(audit_boundaries["f1"])}` | diagnostic only |
+| Inclusive coverage issues | `{coverage_issues}` | `[]` |
+| World duration | `{declared_duration}` | `{expected_duration}` |
+
+This audit does not repair the raw submission or assign a World-Time score.
+"""
+        invalid_audit_html = (
+            '<section class="audit"><h3>Non-scoring Invalid Timeline Audit</h3>'
+            f"<p><strong>Submitted starts:</strong> {html.escape(str(declared_starts))}<br>"
+            f"<strong>Expected starts:</strong> {html.escape(str(expected_starts))}<br>"
+            f"<strong>Boundary F1:</strong> {_metric(audit_boundaries['f1'])}<br>"
+            f"<strong>Coverage issues:</strong> {html.escape(str(coverage_issues))}<br>"
+            "The raw timeline remains invalid and receives no World-Time score.</p></section>"
+        )
     rationale_path = submission_dir / task.output.rationale
     rationale = (
         rationale_path.read_text(encoding="utf-8")
@@ -776,6 +924,8 @@ cross-scene generalization.
 {timeline_markdown}
 
 {svg_markdown}
+
+{invalid_audit_markdown}
 
 ## Canonical 3D Motion
 
@@ -854,6 +1004,7 @@ table{{width:100%;border-collapse:collapse;background:#fff}}
 th,td{{padding:9px 12px;border:1px solid #d8dcde;text-align:left}}
 th{{background:#e9eceb}} code{{background:#e6e9e8;padding:2px 4px}}
 .warning{{border-left:4px solid #c48a12;padding:8px 14px;background:#fff8e8}}
+.audit{{border-left:4px solid #b64238;padding:8px 14px;background:#fff}}
 pre{{white-space:pre-wrap;background:#fff;padding:16px;border:1px solid #d8dcde}}
 </style>
 </head>
@@ -879,6 +1030,7 @@ not model generalization.
 <tbody>{timeline_html_rows}</tbody>
 </table>
 {svg_html}
+{invalid_audit_html}
 <h2>Canonical 3D Motion</h2>
 <table>
 <thead><tr>

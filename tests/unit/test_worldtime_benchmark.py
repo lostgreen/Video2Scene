@@ -269,3 +269,34 @@ def test_report_brackets_submission_with_baselines_and_oracles(
     html_report = result.report_html.read_text(encoding="utf-8")
     assert "prediction.mp4" in html_report
     assert "canonical_reference.mp4" in html_report
+
+
+def test_invalid_timeline_audit_diagnoses_boundaries_without_scoring(
+    tmp_path: Path, monkeypatch: object
+) -> None:
+    task_dir = _build_task(tmp_path, monkeypatch)
+    submission = tmp_path / "submission"
+    _valid_submission(task_dir, submission)
+    timeline_path = submission / "timeline.json"
+    payload = json.loads(timeline_path.read_text(encoding="utf-8"))
+    payload["segments"][0]["video_end_frame"] = 2
+    payload["segments"][1]["video_end_frame"] = 4
+    timeline_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    result = evaluate_model_submission(
+        task_dir=task_dir,
+        submission_dir=submission,
+        output_dir=tmp_path / "invalid_report",
+    )
+
+    evaluation = json.loads(result.evaluation_json.read_text(encoding="utf-8"))
+    assert evaluation["worldtime"]["subagent"] is None
+    audit = evaluation["worldtime"]["invalid_submission_audit"]
+    assert not audit["strict_score_eligible"]
+    assert audit["declared_start_boundaries"] == [0, 2]
+    assert audit["expected_start_boundaries"] == [0, 2]
+    assert audit["internal_boundary_metrics"]["f1"] == 1.0
+    assert audit["inclusive_coverage_issues"]
+    report = result.report_markdown.read_text(encoding="utf-8")
+    assert "Non-scoring Invalid Timeline Audit" in report
+    assert "does not repair" in report
