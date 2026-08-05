@@ -74,6 +74,10 @@ video2scene worldtime inspect-submission \
 An invalid response remains an evaluation result. Do not repair it before scoring or silently
 retry with hidden feedback.
 
+If an invalid timeline is still parseable, the report may compare its declared boundaries and
+endpoints with GT as a clearly labeled non-scoring audit. This diagnostic never repairs the raw
+file, never makes it score-eligible, and stays separate from the primary World-Time metrics.
+
 ## 3D compilation and scoring
 
 Compile both the model prediction and the no-motion public scene with the same asset index and
